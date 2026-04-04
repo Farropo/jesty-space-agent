@@ -10,13 +10,14 @@
         <section
           class="onscreen-agent-shell"
           :class="{
-            'is-collapsed': $store.onscreenAgent.isCollapsed,
+            'is-compact': $store.onscreenAgent.isCompactMode,
+            'is-full': $store.onscreenAgent.isFullMode,
             'is-history-below': $store.onscreenAgent.isHistoryBelow,
             'is-right': $store.onscreenAgent.isDockedRight
           }"
           x-cloak
           :style="$store.onscreenAgent.positionStyle"
-          x-init="$nextTick(() => $store.onscreenAgent.mount({ attachmentInput: $refs.attachmentInput, historyDialog: $refs.historyDialog, input: $refs.input, rawDialog: $refs.rawDialog, scroller: $refs.scroller, settingsDialog: $refs.settingsDialog, thread: $refs.thread }))"
+          x-init="$nextTick(() => $store.onscreenAgent.mount({ actionMenu: $refs.actionMenu, attachmentInput: $refs.attachmentInput, historyDialog: $refs.historyDialog, input: $refs.input, rawDialog: $refs.rawDialog, scroller: $refs.scroller, settingsDialog: $refs.settingsDialog, thread: $refs.thread }))"
           x-destroy="$store.onscreenAgent.unmount()"
         >
           <div class="onscreen-agent-cluster">
@@ -41,8 +42,8 @@
             <button
               type="button"
               class="onscreen-agent-avatar-button"
-              :aria-expanded="String(!$store.onscreenAgent.isCollapsed)"
-              aria-label="Drag or collapse onscreen agent"
+              :aria-label="$store.onscreenAgent.avatarButtonLabel"
+              :title="$store.onscreenAgent.avatarButtonLabel"
               @pointerdown="$store.onscreenAgent.handleAgentPointerDown($event)"
             >
               <span class="onscreen-agent-avatar-orbit">
@@ -68,23 +69,15 @@
                 <div class="chat-thread" x-ref="thread" data-chat-thread @click="$store.onscreenAgent.handleThreadClick($event)"></div>
               </div>
 
-              <button
-                type="button"
-                class="onscreen-agent-collapse-bubble"
-                x-show="$store.onscreenAgent.isCollapsed"
-                x-transition.opacity.duration.100ms
-                @click="$store.onscreenAgent.expand()"
-                :aria-label="$store.onscreenAgent.isDockedRight ? 'Expand chat to the left' : 'Expand chat to the right'"
-              >
-                <x-icon x-text="$store.onscreenAgent.expandIcon"></x-icon>
-              </button>
-
               <div
                 class="onscreen-agent-panel"
-                x-show="!$store.onscreenAgent.isCollapsed"
-                x-transition.opacity.duration.100ms
+                :class="{ 'is-compact': $store.onscreenAgent.isCompactMode }"
               >
-                <form class="onscreen-agent-composer" @submit.prevent="$store.onscreenAgent.handleComposerPrimaryAction()">
+                <form
+                  class="onscreen-agent-composer"
+                  :class="{ 'is-compact': $store.onscreenAgent.isCompactMode }"
+                  @submit.prevent="$store.onscreenAgent.handleComposerPrimaryAction()"
+                >
                   <input
                     x-ref="attachmentInput"
                     type="file"
@@ -119,6 +112,7 @@
                       <x-icon x-text="$store.onscreenAgent.primaryActionIcon"></x-icon>
                     </button>
                     <button
+                      x-show="$store.onscreenAgent.isFullMode"
                       type="button"
                       class="onscreen-agent-inline-button onscreen-agent-attach-button"
                       :disabled="$store.onscreenAgent.isAttachmentPickerDisabled"
@@ -127,6 +121,19 @@
                       title="Attach files"
                     >
                       <x-icon>attach_file</x-icon>
+                    </button>
+                    <button
+                      x-show="$store.onscreenAgent.isCompactMode"
+                      type="button"
+                      class="onscreen-agent-inline-button onscreen-agent-menu-button"
+                      :aria-expanded="String($store.onscreenAgent.isComposerActionMenuOpen)"
+                      aria-controls="onscreen-agent-composer-menu"
+                      aria-haspopup="menu"
+                      @click="$store.onscreenAgent.toggleComposerActionMenu($event)"
+                      aria-label="Open chat actions"
+                      title="Open chat actions"
+                    >
+                      <x-icon>more_horiz</x-icon>
                     </button>
                   </div>
                 </form>
@@ -147,7 +154,19 @@
                   </div>
                 </template>
 
-                <div class="onscreen-agent-footer">
+                <div
+                  class="onscreen-agent-footer"
+                  x-show="$store.onscreenAgent.isFullMode"
+                >
+                  <button
+                    type="button"
+                    class="onscreen-agent-footer-icon"
+                    @click="$store.onscreenAgent.showCompactMode()"
+                    aria-label="Switch to compact chat mode"
+                    title="Switch to compact chat mode"
+                  >
+                    <x-icon>close_fullscreen</x-icon>
+                  </button>
                   <button
                     type="button"
                     class="chat-option onscreen-agent-llm-button"
@@ -196,8 +215,39 @@
           </div>
 
           <template x-teleport="body">
+            <div class="space-popover-layer" x-show="$store.onscreenAgent.isComposerActionMenuOpen" x-cloak>
+              <div
+                id="onscreen-agent-composer-menu"
+                class="space-popover-panel onscreen-agent-action-menu"
+                x-ref="actionMenu"
+                x-show="$store.onscreenAgent.isComposerActionMenuOpen"
+                :style="$store.onscreenAgent.composerActionMenuStyle"
+                @click.outside="$store.onscreenAgent.closeComposerActionMenu()"
+                @keydown.escape.window="$store.onscreenAgent.closeComposerActionMenu()"
+              >
+                <template x-for="action in $store.onscreenAgent.composerActionMenuActions" :key="action.id">
+                  <button
+                    type="button"
+                    class="space-popover-action"
+                    :class="{ 'is-danger': action.danger }"
+                    @click="$store.onscreenAgent.submitComposerActionMenuAction(action.id)"
+                  >
+                    <x-icon x-text="action.icon"></x-icon>
+                    <span class="space-popover-action-label" x-text="action.label"></span>
+                  </button>
+                </template>
+              </div>
+            </div>
+          </template>
+
+          <template x-teleport="body">
             <div class="space-dialog-layer">
-              <dialog class="chat-dialog" x-ref="settingsDialog" @cancel.prevent="$store.onscreenAgent.closeSettingsDialog()">
+              <dialog
+                id="onscreen-agent-settings-dialog"
+                class="chat-dialog"
+                x-ref="settingsDialog"
+                @cancel.prevent="$store.onscreenAgent.closeSettingsDialog()"
+              >
                 <form method="dialog" class="dialog-card" @submit.prevent="$store.onscreenAgent.saveSettingsFromDialog()">
                   <header class="dialog-header">
                     <div>
@@ -259,7 +309,12 @@
                 </form>
               </dialog>
 
-              <dialog class="chat-dialog" x-ref="rawDialog" @cancel.prevent="$store.onscreenAgent.closeRawDialog()">
+              <dialog
+                id="onscreen-agent-raw-dialog"
+                class="chat-dialog"
+                x-ref="rawDialog"
+                @cancel.prevent="$store.onscreenAgent.closeRawDialog()"
+              >
                 <div class="dialog-card dialog-card-raw">
                   <header class="dialog-header">
                     <div>
@@ -276,7 +331,12 @@
                 </div>
               </dialog>
 
-              <dialog class="chat-dialog" x-ref="historyDialog" @cancel.prevent="$store.onscreenAgent.closePromptHistoryDialog()">
+              <dialog
+                id="onscreen-agent-history-dialog"
+                class="chat-dialog"
+                x-ref="historyDialog"
+                @cancel.prevent="$store.onscreenAgent.closePromptHistoryDialog()"
+              >
                 <div class="dialog-card dialog-card-raw">
                   <header class="dialog-header">
                     <div>

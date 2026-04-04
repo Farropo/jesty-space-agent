@@ -9,6 +9,7 @@
 .space-panel,
 .admin-panel {
   display: grid;
+  box-sizing: border-box;
   gap: 16px;
   padding-bottom: 24px;
 }

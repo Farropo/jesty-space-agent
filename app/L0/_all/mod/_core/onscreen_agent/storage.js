@@ -1,12 +1,23 @@
 import * as config from "/mod/_core/onscreen_agent/config.js";
 
+const DISPLAY_MODE_FULL = "full";
+const DISPLAY_MODE_COMPACT = "compact";
+
+function normalizeDisplayMode(value) {
+  if (value === DISPLAY_MODE_FULL || value === DISPLAY_MODE_COMPACT) {
+    return value;
+  }
+
+  return "";
+}
+
 function createDefaultConfig() {
   return {
     settings: { ...config.DEFAULT_ONSCREEN_AGENT_SETTINGS },
     systemPrompt: "",
     agentX: null,
     agentY: null,
-    isCollapsed: true
+    displayMode: DISPLAY_MODE_COMPACT
   };
 }
 
@@ -43,9 +54,9 @@ function normalizeStoredConfig(parsedConfig) {
   const storedConfig = parsedConfig && typeof parsedConfig === "object" ? parsedConfig : {};
   const storedMaxTokens =
     storedConfig.max_tokens ?? storedConfig.maxTokens ?? config.DEFAULT_ONSCREEN_AGENT_SETTINGS.maxTokens;
-
   const rawX = storedConfig.agent_x ?? storedConfig.agentX;
   const rawY = storedConfig.agent_y ?? storedConfig.agentY;
+  const storedDisplayMode = normalizeDisplayMode(storedConfig.display_mode ?? storedConfig.displayMode);
 
   return {
     settings: {
@@ -64,19 +75,21 @@ function normalizeStoredConfig(parsedConfig) {
     ).trim(),
     agentX: typeof rawX === "number" && Number.isFinite(rawX) ? rawX : null,
     agentY: typeof rawY === "number" && Number.isFinite(rawY) ? rawY : null,
-    isCollapsed: storedConfig.collapsed === true
+    displayMode: storedDisplayMode || (storedConfig.collapsed === true ? DISPLAY_MODE_COMPACT : DISPLAY_MODE_FULL)
   };
 }
 
-function buildStoredConfigPayload({ settings, systemPrompt, agentX, agentY, isCollapsed }) {
+function buildStoredConfigPayload({ settings, systemPrompt, agentX, agentY, displayMode }) {
   const normalizedSystemPrompt = typeof systemPrompt === "string" ? systemPrompt.trim() : "";
+  const normalizedDisplayMode = normalizeDisplayMode(displayMode) || DISPLAY_MODE_COMPACT;
   const payload = {
     api_endpoint: String(settings?.apiEndpoint || config.DEFAULT_ONSCREEN_AGENT_SETTINGS.apiEndpoint || "").trim(),
     api_key: String(settings?.apiKey || config.DEFAULT_ONSCREEN_AGENT_SETTINGS.apiKey || "").trim(),
     max_tokens: config.normalizeOnscreenAgentMaxTokens(settings?.maxTokens),
     model: String(settings?.model || config.DEFAULT_ONSCREEN_AGENT_SETTINGS.model || "").trim(),
     params: String(settings?.paramsText || config.DEFAULT_ONSCREEN_AGENT_SETTINGS.paramsText || "").trim(),
-    collapsed: isCollapsed === true
+    display_mode: normalizedDisplayMode,
+    collapsed: false
   };
 
   if (typeof agentX === "number" && Number.isFinite(agentX)) {

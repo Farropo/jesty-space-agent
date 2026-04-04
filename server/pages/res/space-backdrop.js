@@ -22,47 +22,6 @@
     ])
   });
 
-  function clampSpaceBackdropZoom(value) {
-    if (!Number.isFinite(value) || value <= 0) {
-      return 1;
-    }
-
-    return Math.min(4, Math.max(0.25, value));
-  }
-
-  function createSpaceBackdropZoomBaseline() {
-    return Object.freeze({
-      devicePixelRatio: windowObject.devicePixelRatio || 1,
-      outerInnerRatio:
-        windowObject.innerWidth > 0 && windowObject.outerWidth > 0
-          ? windowObject.outerWidth / windowObject.innerWidth
-          : 1,
-      visualViewportScale: windowObject.visualViewport?.scale || 1
-    });
-  }
-
-  function measureSpaceBackdropZoom(baseline) {
-    const visualViewportScale = windowObject.visualViewport?.scale || 1;
-
-    if (Math.abs(visualViewportScale - baseline.visualViewportScale) > 0.001) {
-      return clampSpaceBackdropZoom(visualViewportScale / baseline.visualViewportScale);
-    }
-
-    const devicePixelRatio = windowObject.devicePixelRatio || baseline.devicePixelRatio || 1;
-
-    if (Math.abs(devicePixelRatio - baseline.devicePixelRatio) > 0.001) {
-      return clampSpaceBackdropZoom(devicePixelRatio / baseline.devicePixelRatio);
-    }
-
-    if (windowObject.innerWidth > 0 && windowObject.outerWidth > 0 && baseline.outerInnerRatio > 0) {
-      return clampSpaceBackdropZoom(
-        (windowObject.outerWidth / windowObject.innerWidth) / baseline.outerInnerRatio
-      );
-    }
-
-    return 1;
-  }
-
   function addMediaChangeListener(mediaQuery, handler) {
     if (typeof mediaQuery?.addEventListener === "function") {
       mediaQuery.addEventListener("change", handler);
@@ -99,7 +58,6 @@
     const trailEls = Array.from(root.querySelectorAll(SPACE_BACKDROP_TRAIL_SELECTOR));
     const trailTimers = new WeakMap();
     const trailAnimationEndHandlers = new Map();
-    const zoomBaseline = createSpaceBackdropZoomBaseline();
     let zoomFrame = 0;
 
     const syncScale = () => {
@@ -109,9 +67,7 @@
         return;
       }
 
-      const pageZoom = measureSpaceBackdropZoom(zoomBaseline);
-      const backdropScale = pageZoom > 0 ? 1 / pageZoom : 1;
-      canvas.style.setProperty("--space-backdrop-scale", backdropScale.toFixed(4));
+      canvas.style.setProperty("--space-backdrop-scale", "1");
     };
 
     const requestScaleSync = () => {
@@ -253,6 +209,7 @@
           zoomFrame = 0;
         }
 
+        canvas?.style.removeProperty("--space-backdrop-scale");
         windowObject.removeEventListener("resize", requestScaleSync);
         windowObject.visualViewport?.removeEventListener("resize", requestScaleSync);
         windowObject.visualViewport?.removeEventListener("scroll", requestScaleSync);

@@ -6,6 +6,8 @@
 
 Keep this file scoped to command-module behavior and help metadata. Repo-wide CLI surface and top-level command names still belong in `/AGENTS.md`.
 
+This is one of the five core docs. It owns the command-tree contract for `commands/`. If command-specific helper subtrees later grow their own `AGENTS.md` files, those local docs should own the implementation detail while this file stays focused on the command surface and conventions.
+
 Documentation is top priority for this area. After any change to command discovery, command behavior, command help, or the command tree under `commands/`, update this file in the same session before finishing.
 
 ## Contract

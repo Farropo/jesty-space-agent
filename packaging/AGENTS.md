@@ -6,6 +6,8 @@
 
 Keep this file scoped to native hosting and packaging behavior. Repo-wide packaging surface and install commands still belong in `/AGENTS.md`.
 
+This is one of the five core docs. It owns the packaging subtree contract. If platform-specific packaging areas later grow their own `AGENTS.md` files, those local docs should own the detailed implementation guidance while this file stays focused on packaging-wide structure and principles.
+
 Documentation is top priority for this area. After any change under `packaging/` or any packaging contract change owned here, update this file in the same session before finishing.
 
 ## Current State

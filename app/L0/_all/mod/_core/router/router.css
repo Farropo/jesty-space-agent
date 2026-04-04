@@ -41,6 +41,7 @@ body.app-page-router > div[x-data] {
 
 .router-stage-inner {
   display: grid;
+  box-sizing: border-box;
   width: min(100%, 84rem);
   min-height: 100%;
   margin: 0 auto;

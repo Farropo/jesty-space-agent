@@ -5,6 +5,7 @@ import * as llmParams from "/mod/_core/onscreen_agent/llm-params.js";
 import * as prompt from "/mod/_core/onscreen_agent/prompt.js";
 import * as storage from "/mod/_core/onscreen_agent/storage.js";
 import * as agentView from "/mod/_core/onscreen_agent/view.js";
+import { positionPopover } from "/mod/_core/visual/chrome/popover.js";
 import { closeDialog, openDialog } from "/mod/_core/visual/forms/dialog.js";
 import { countTextTokens } from "/mod/_core/framework/js/token-count.js";
 import {
@@ -16,14 +17,24 @@ import {
 
 const CONFIG_PERSIST_DELAY_MS = 180;
 const AGENT_IDLE_HINT_DELAY_MS = 2000;
-const AGENT_IDLE_HINT_HIDE_DELAY_MS = 3200;
+const COMPACT_MODE_TOP_EDGE_THRESHOLD_EM = 10;
+const DISPLAY_MODE_FULL = "full";
+const DISPLAY_MODE_COMPACT = "compact";
 const DRAG_CLICK_THRESHOLD = 6;
 const MAX_COMPACT_TRIM_ATTEMPTS = 4;
 const MAX_PROTOCOL_RETRY_COUNT = 2;
 const POSITION_MARGIN = 16;
+const UI_BUBBLE_AUTO_HIDE_BASE_MS = 1400;
+const UI_BUBBLE_AUTO_HIDE_MAX_MS = 12000;
+const UI_BUBBLE_AUTO_HIDE_MIN_MS = 2200;
+const UI_BUBBLE_AUTO_HIDE_PER_CHAR_MS = 28;
+const UI_BUBBLE_AUTO_HIDE_PER_WORD_MS = 260;
 const UI_BUBBLE_ENTER_DURATION_MS = 420;
 const UI_BUBBLE_EXIT_DURATION_MS = 180;
 const IDLE_HINT_BUBBLE_TEXT = "Drag me, tap me.";
+const HISTORY_DIALOG_ELEMENT_ID = "onscreen-agent-history-dialog";
+const RAW_DIALOG_ELEMENT_ID = "onscreen-agent-raw-dialog";
+const SETTINGS_DIALOG_ELEMENT_ID = "onscreen-agent-settings-dialog";
 
 function getRuntime() {
   const runtime = globalThis.space;
@@ -37,6 +48,26 @@ function getRuntime() {
   }
 
   return runtime;
+}
+
+function resolveDialogRef(refs, refKey, elementId) {
+  const existingRef = refs && typeof refs === "object" ? refs[refKey] : null;
+
+  if (existingRef) {
+    return existingRef;
+  }
+
+  if (!elementId) {
+    return null;
+  }
+
+  const dialog = document.getElementById(elementId);
+
+  if (dialog && refs && typeof refs === "object") {
+    refs[refKey] = dialog;
+  }
+
+  return dialog;
 }
 
 function ensureCurrentChatRuntime(targetRuntime) {
@@ -243,6 +274,12 @@ function clearTimer(timerId) {
   return 0;
 }
 
+function getRootFontSizePx() {
+  const rootStyle = globalThis.getComputedStyle?.(document.documentElement);
+  const fontSize = Number.parseFloat(rootStyle?.fontSize || "");
+  return Number.isFinite(fontSize) && fontSize > 0 ? fontSize : 16;
+}
+
 function normalizeUiBubbleHideDelay(value) {
   const normalizedValue = Number(value);
 
@@ -253,11 +290,132 @@ function normalizeUiBubbleHideDelay(value) {
   return Math.max(0, Math.round(normalizedValue));
 }
 
+function getAutoUiBubbleHideDelay(text) {
+  const normalizedText = typeof text === "string" ? text.trim() : "";
+
+  if (!normalizedText) {
+    return 0;
+  }
+
+  const charCount = Array.from(normalizedText).length;
+  const wordCount = normalizedText.split(/\s+/u).filter(Boolean).length;
+  const estimatedDelay = UI_BUBBLE_AUTO_HIDE_BASE_MS + Math.max(
+    charCount * UI_BUBBLE_AUTO_HIDE_PER_CHAR_MS,
+    wordCount * UI_BUBBLE_AUTO_HIDE_PER_WORD_MS
+  );
+
+  return Math.min(UI_BUBBLE_AUTO_HIDE_MAX_MS, Math.max(UI_BUBBLE_AUTO_HIDE_MIN_MS, estimatedDelay));
+}
+
+function createComposerActionMenuPosition() {
+  return {
+    left: 12,
+    maxHeight: 240,
+    top: 12
+  };
+}
+
+function normalizeDisplayMode(value) {
+  if (value === DISPLAY_MODE_FULL || value === DISPLAY_MODE_COMPACT) {
+    return value;
+  }
+
+  return DISPLAY_MODE_COMPACT;
+}
+
+function getNextDisplayMode(value) {
+  return normalizeDisplayMode(value) === DISPLAY_MODE_FULL ? DISPLAY_MODE_COMPACT : DISPLAY_MODE_FULL;
+}
+
+function normalizeUiBubbleText(text) {
+  if (typeof text !== "string") {
+    return "";
+  }
+
+  return text
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/^\n+/u, "")
+    .replace(/\n+$/u, "");
+}
+
+function extractAssistantBubbleText(content) {
+  if (typeof content !== "string" || !content.trim()) {
+    return "";
+  }
+
+  let normalizedContent = content;
+
+  execution.extractExecuteBlocks(content).forEach((block) => {
+    if (typeof block?.raw === "string" && block.raw) {
+      normalizedContent = normalizedContent.replace(block.raw, "");
+    }
+  });
+
+  return normalizeUiBubbleText(normalizedContent);
+}
+
+function runOnNextFrame(callback) {
+  if (typeof callback !== "function") {
+    return;
+  }
+
+  window.requestAnimationFrame(() => {
+    callback();
+  });
+}
+
+function countDisplayLines(text) {
+  const normalizedText =
+    typeof text === "string" ? text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trimEnd() : "";
+
+  if (!normalizedText.trim()) {
+    return 0;
+  }
+
+  return normalizedText.split("\n").length;
+}
+
+function formatLineCount(lineCount) {
+  return `${lineCount.toLocaleString()} ${lineCount === 1 ? "line" : "lines"}`;
+}
+
+function getStreamingAssistantStatus(content) {
+  const normalizedContent = typeof content === "string" ? content : "";
+  const executeBlocks = execution.extractExecuteBlocks(normalizedContent);
+
+  if (executeBlocks.length) {
+    const codeLineCount = countDisplayLines(executeBlocks[0]?.code || "");
+
+    if (codeLineCount > 0) {
+      return `Writing ${formatLineCount(codeLineCount)} of code...`;
+    }
+
+    return "Preparing code...";
+  }
+
+  if (normalizedContent.trim()) {
+    return "Writing response...";
+  }
+
+  return "Thinking...";
+}
+
+function getExecutionStatusText(code, index, total) {
+  const lineCount = countDisplayLines(code);
+  const lineCountLabel = lineCount > 0 ? `Executing ${formatLineCount(lineCount)} of code` : "Executing code";
+
+  return total > 1 ? `${lineCountLabel} (${index + 1}/${total})...` : `${lineCountLabel}...`;
+}
+
 const model = {
   activeRequestController: null,
+  composerActionMenuAnchor: null,
+  composerActionMenuPosition: createComposerActionMenuPosition(),
   configPersistTimer: 0,
   currentChatRuntime: null,
   defaultSystemPrompt: "",
+  displayMode: DISPLAY_MODE_COMPACT,
   draft: "",
   draftAttachments: [],
   dragState: null,
@@ -270,7 +428,6 @@ const model = {
   hasInteracted: false,
   initializationPromise: null,
   interactionHintTimer: 0,
-  isCollapsed: true,
   isCompactingHistory: false,
   isInitialized: false,
   isLoadingDefaultSystemPrompt: false,
@@ -286,6 +443,7 @@ const model = {
   rawOutputContent: "",
   rawOutputTitle: "Raw LLM Output",
   refs: {
+    actionMenu: null,
     attachmentInput: null,
     historyDialog: null,
     input: null,
@@ -337,8 +495,60 @@ const model = {
     return statusText === "Ready." ? "Ready. Message Space Agent..." : statusText;
   },
 
+  get composerActionMenuActions() {
+    return [
+      {
+        icon: "open_in_full",
+        id: "full-mode",
+        label: "Full mode"
+      },
+      {
+        icon: "attach_file",
+        id: "attach",
+        label: "Attachment"
+      },
+      {
+        icon: this.compactButtonIcon,
+        id: "compact-history",
+        label: "Compact context"
+      },
+      {
+        danger: true,
+        icon: "restart_alt",
+        id: "clear",
+        label: "Clear chat"
+      },
+      {
+        icon: "notes",
+        id: "history",
+        label: "History"
+      },
+      {
+        icon: "tune",
+        id: "settings",
+        label: "Model settings"
+      }
+    ];
+  },
+
+  get composerActionMenuStyle() {
+    return {
+      left: `${this.composerActionMenuPosition.left}px`,
+      maxHeight: `${this.composerActionMenuPosition.maxHeight}px`,
+      top: `${this.composerActionMenuPosition.top}px`
+    };
+  },
+
   get isComposerInputDisabled() {
     return !this.isInitialized || this.isCompactingHistory;
+  },
+
+  get isCompactMode() {
+    return this.displayMode === DISPLAY_MODE_COMPACT;
+  },
+
+  get isComposerActionMenuOpen() {
+    return Boolean(this.composerActionMenuAnchor);
   },
 
   get hasDraftSubmission() {
@@ -456,6 +666,10 @@ const model = {
     return this.isCompactingHistory ? "progress_activity" : "compress";
   },
 
+  get isFullMode() {
+    return this.displayMode === DISPLAY_MODE_FULL;
+  },
+
   get promptHistoryContent() {
     if (this.promptHistoryMode === "json") {
       return JSON.stringify(this.promptHistoryMessages, null, 2);
@@ -483,19 +697,27 @@ const model = {
   },
 
   get isHistoryBelow() {
-    return this.agentY < Math.max(140, this.getViewportHeight() * 0.32);
+    return this.agentY < this.getViewportHeight() * 0.5;
+  },
+
+  get isCompactModeNearTopEdge() {
+    return this.agentY < Math.max(POSITION_MARGIN, getRootFontSizePx() * COMPACT_MODE_TOP_EDGE_THRESHOLD_EM);
   },
 
   get isUiBubbleBelowHead() {
-    return this.isHistoryBelow;
+    return this.isCompactMode ? this.isCompactModeNearTopEdge : this.isHistoryBelow;
   },
 
-  get expandIcon() {
-    return this.isDockedRight ? "chevron_left" : "chevron_right";
+  get shouldOpenComposerActionMenuBelow() {
+    return this.isCompactMode ? this.isCompactModeNearTopEdge : this.isHistoryBelow;
+  },
+
+  get avatarButtonLabel() {
+    return this.isFullMode ? "Switch to compact chat mode" : "Switch to full chat mode";
   },
 
   get shouldShowHistory() {
-    return !this.isCollapsed && this.history.length > 0;
+    return this.isFullMode && this.history.length > 0;
   },
 
   get positionStyle() {
@@ -571,7 +793,7 @@ const model = {
       await storage.saveOnscreenAgentConfig({
         agentX: this.agentX,
         agentY: this.agentY,
-        isCollapsed: this.isCollapsed,
+        displayMode: this.displayMode,
         settings: this.settings,
         systemPrompt: this.systemPrompt
       });
@@ -600,10 +822,32 @@ const model = {
     this.hasInteracted = true;
     this.clearInteractionHintTimer();
 
-    if (options.hideBubble !== false) {
+    if (options.hideBubble === true) {
       this.dismissUiBubble({
         clearQueue: options.clearBubbleQueue !== false
       });
+    }
+  },
+
+  showCompactAssistantReplyBubble(assistantContent) {
+    if (!this.isCompactMode) {
+      return;
+    }
+
+    const bubbleText = extractAssistantBubbleText(assistantContent);
+
+    if (!bubbleText) {
+      return;
+    }
+
+    this.showUiBubble(bubbleText);
+  },
+
+  setStreamingAssistantStatus(content) {
+    const nextStatus = getStreamingAssistantStatus(content);
+
+    if (this.status !== nextStatus) {
+      this.status = nextStatus;
     }
   },
 
@@ -617,18 +861,18 @@ const model = {
     this.interactionHintTimer = window.setTimeout(() => {
       this.interactionHintTimer = 0;
 
-      if (this.hasInteracted || !this.isCollapsed || this.dragState?.moved === true) {
+      if (this.hasInteracted || !this.isCompactMode || this.dragState?.moved === true) {
         return;
       }
 
-      this.showUiBubble(IDLE_HINT_BUBBLE_TEXT, AGENT_IDLE_HINT_HIDE_DELAY_MS);
+      this.showUiBubble(IDLE_HINT_BUBBLE_TEXT);
     }, AGENT_IDLE_HINT_DELAY_MS);
   },
 
   showUiBubble(text, hideAfterMs = 0) {
-    const normalizedText = typeof text === "string" ? text.trim() : "";
+    const normalizedText = normalizeUiBubbleText(text);
 
-    if (!normalizedText) {
+    if (!normalizedText.trim()) {
       this.dismissUiBubble({
         clearQueue: true
       });
@@ -636,7 +880,7 @@ const model = {
     }
 
     this.nextUiBubble = {
-      hideAfterMs: normalizeUiBubbleHideDelay(hideAfterMs),
+      hideAfterMs: normalizeUiBubbleHideDelay(hideAfterMs) || getAutoUiBubbleHideDelay(normalizedText),
       text: normalizedText
     };
     this.flushUiBubbleQueue();
@@ -802,7 +1046,6 @@ const model = {
           storage.loadOnscreenAgentConfig(),
           storage.loadOnscreenAgentHistory()
         ]);
-        const shouldPersistBootCollapse = storedConfig.isCollapsed !== true;
 
         this.settings = {
           ...storedConfig.settings
@@ -814,7 +1057,7 @@ const model = {
         this.systemPromptDraft = storedConfig.systemPrompt;
         this.agentX = storedConfig.agentX;
         this.agentY = storedConfig.agentY;
-        this.isCollapsed = true;
+        this.displayMode = normalizeDisplayMode(storedConfig.displayMode);
         this.replaceHistory(storedHistory.map((message) => normalizeStoredMessage(message)));
         this.ensurePosition();
 
@@ -835,11 +1078,9 @@ const model = {
         this.status = "Ready.";
         this.render();
 
-        if (shouldPersistBootCollapse) {
-          this.scheduleConfigPersist();
+        if (this.hasInteracted) {
+          this.focusInput();
         }
-
-        this.focusInput();
       } catch (error) {
         this.status = error.message;
         this.render();
@@ -851,6 +1092,7 @@ const model = {
 
   mount(refs = {}) {
     this.refs = {
+      actionMenu: refs.actionMenu || null,
       attachmentInput: refs.attachmentInput || null,
       historyDialog: refs.historyDialog || null,
       input: refs.input || null,
@@ -863,6 +1105,7 @@ const model = {
     if (!this.resizeHandler) {
       this.resizeHandler = () => {
         this.ensurePosition();
+        this.positionComposerActionMenu();
         this.render({
           preserveScroll: true
         });
@@ -915,6 +1158,7 @@ const model = {
     this.clearUiBubbleEnterTimer();
     this.clearUiBubbleAutoHideTimer();
     this.clearUiBubbleExitTimer();
+    this.closeComposerActionMenu();
     this.nextUiBubble = null;
     this.isUiBubbleMounted = false;
     this.uiBubblePhase = "";
@@ -931,6 +1175,7 @@ const model = {
     }
 
     this.refs = {
+      actionMenu: null,
       attachmentInput: null,
       historyDialog: null,
       input: null,
@@ -1004,41 +1249,56 @@ const model = {
       return;
     }
 
-    this.toggleCollapsed();
+    this.cycleDisplayMode();
   },
 
-  toggleCollapsed() {
-    this.isCollapsed = !this.isCollapsed;
-    this.scheduleConfigPersist();
-    this.dismissUiBubble({
-      clearQueue: true
-    });
-    this.render({
-      preserveScroll: true
-    });
-
-    if (!this.isCollapsed) {
-      this.focusInput();
-    }
+  cycleDisplayMode() {
+    this.setDisplayMode(getNextDisplayMode(this.displayMode));
   },
 
-  expand() {
+  showFullMode(options = {}) {
     this.recordInteraction();
+    this.setDisplayMode(DISPLAY_MODE_FULL, options);
+  },
 
-    if (!this.isCollapsed) {
-      this.focusInput();
-      return;
+  showCompactMode(options = {}) {
+    this.recordInteraction();
+    this.setDisplayMode(DISPLAY_MODE_COMPACT, options);
+  },
+
+  setDisplayMode(nextMode, options = {}) {
+    const previousMode = this.displayMode;
+    const normalizedMode = normalizeDisplayMode(nextMode);
+    const shouldPersist = options.persist !== false;
+    const shouldHideBubble = options.hideBubble === true || normalizedMode === DISPLAY_MODE_FULL;
+    const shouldFocusInput = options.focusInput !== false;
+    const modeChanged = normalizedMode !== this.displayMode;
+    const shouldScrollToLatestOnRender = normalizedMode === DISPLAY_MODE_FULL && previousMode !== DISPLAY_MODE_FULL;
+
+    this.displayMode = normalizedMode;
+    this.closeComposerActionMenu();
+
+    if (shouldPersist && modeChanged) {
+      this.scheduleConfigPersist();
     }
 
-    this.isCollapsed = false;
-    this.scheduleConfigPersist();
-    this.dismissUiBubble({
-      clearQueue: true
-    });
+    if (shouldHideBubble) {
+      this.dismissUiBubble({
+        clearQueue: true
+      });
+    }
+
     this.render({
-      preserveScroll: true
+      preserveScroll: !shouldScrollToLatestOnRender
     });
-    this.focusInput();
+
+    if (shouldScrollToLatestOnRender) {
+      this.scrollHistoryToLatest();
+    }
+
+    if (shouldFocusInput) {
+      this.focusInput();
+    }
   },
 
   async ensureDefaultSystemPrompt(options = {}) {
@@ -1087,7 +1347,7 @@ const model = {
 
     this.pendingStreamingMessage = message;
 
-    if (this.streamingRenderFrame) {
+    if (this.streamingRenderFrame || !this.isFullMode) {
       return;
     }
 
@@ -1096,7 +1356,7 @@ const model = {
       const pendingMessage = this.pendingStreamingMessage;
       this.pendingStreamingMessage = null;
 
-      if (!pendingMessage || !this.refs.thread) {
+      if (!pendingMessage || !this.refs.thread || !this.isFullMode) {
         return;
       }
 
@@ -1107,6 +1367,10 @@ const model = {
   },
 
   render(options = {}) {
+    if (!this.isFullMode) {
+      return;
+    }
+
     agentView.renderMessages(this.refs.thread, this.history, {
       isConversationBusy: this.isSending,
       outputOverrides: this.executionOutputOverrides,
@@ -1117,10 +1381,32 @@ const model = {
     });
   },
 
+  scrollHistoryToLatest() {
+    const applyScroll = () => {
+      const scroller = this.refs.scroller;
+
+      if (!scroller || !this.isFullMode) {
+        return;
+      }
+
+      scroller.scrollTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+    };
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        applyScroll();
+
+        window.requestAnimationFrame(() => {
+          applyScroll();
+        });
+      });
+    });
+  },
+
   focusInput() {
     const input = this.refs.input;
 
-    if (!input || input.disabled || this.isCollapsed) {
+    if (!input || input.disabled) {
       return;
     }
 
@@ -1232,7 +1518,95 @@ const model = {
   },
 
   handleDraftInput(event) {
+    this.recordInteraction();
     this.syncDraft(event.target.value);
+  },
+
+  closeComposerActionMenu() {
+    this.composerActionMenuAnchor = null;
+    this.composerActionMenuPosition = createComposerActionMenuPosition();
+  },
+
+  openComposerActionMenu(anchor) {
+    this.composerActionMenuAnchor = anchor || null;
+
+    globalThis.requestAnimationFrame(() => {
+      this.positionComposerActionMenu();
+
+      globalThis.requestAnimationFrame(() => {
+        this.positionComposerActionMenu();
+      });
+    });
+  },
+
+  positionComposerActionMenu() {
+    const actionMenu = this.refs.actionMenu || document.getElementById("onscreen-agent-composer-menu");
+
+    if (!this.isComposerActionMenuOpen || !actionMenu || !this.composerActionMenuAnchor) {
+      return;
+    }
+
+    this.refs.actionMenu = actionMenu;
+    this.composerActionMenuPosition = positionPopover(actionMenu, this.composerActionMenuAnchor, {
+      align: "end",
+      placement: this.shouldOpenComposerActionMenuBelow ? "bottom" : "top"
+    });
+  },
+
+  async submitComposerActionMenuAction(actionId) {
+    this.closeComposerActionMenu();
+
+    switch (actionId) {
+      case "full-mode":
+        this.showFullMode();
+        return;
+      case "attach":
+        this.openAttachmentPicker();
+        return;
+      case "clear":
+        if (this.isSending || this.isLoadingDefaultSystemPrompt || this.isCompactingHistory) {
+          return;
+        }
+
+        await this.handleClearClick();
+        return;
+      case "compact-history":
+        if (this.isCompactDisabled) {
+          return;
+        }
+
+        await this.handleCompactClick();
+        return;
+      case "history":
+        runOnNextFrame(() => {
+          void this.openPromptHistoryDialog();
+        });
+        return;
+      case "settings":
+        runOnNextFrame(() => {
+          this.openSettingsDialog();
+        });
+        return;
+      default:
+        return;
+    }
+  },
+
+  toggleComposerActionMenu(event) {
+    const anchor = event?.currentTarget || null;
+
+    if (!anchor) {
+      return;
+    }
+
+    this.recordInteraction();
+
+    if (this.composerActionMenuAnchor === anchor) {
+      this.closeComposerActionMenu();
+      return;
+    }
+
+    this.openComposerActionMenu(anchor);
   },
 
   openAttachmentPicker() {
@@ -1240,6 +1614,7 @@ const model = {
       return;
     }
 
+    this.recordInteraction();
     this.refs.attachmentInput?.click();
   },
 
@@ -1309,6 +1684,8 @@ const model = {
   },
 
   handleComposerPrimaryAction() {
+    this.recordInteraction();
+
     if (this.isSending) {
       if (this.queueDraftSubmission()) {
         return;
@@ -1335,15 +1712,16 @@ const model = {
   },
 
   openSettingsDialog() {
+    this.recordInteraction();
     this.settingsDraft = {
       ...this.settings
     };
     this.systemPromptDraft = this.systemPrompt;
-    openDialog(this.refs.settingsDialog);
+    openDialog(resolveDialogRef(this.refs, "settingsDialog", SETTINGS_DIALOG_ELEMENT_ID));
   },
 
   closeSettingsDialog() {
-    closeDialog(this.refs.settingsDialog);
+    closeDialog(resolveDialogRef(this.refs, "settingsDialog", SETTINGS_DIALOG_ELEMENT_ID));
   },
 
   resetSettingsDraftToDefaults() {
@@ -1400,28 +1778,30 @@ const model = {
 
     this.rawOutputTitle = "Raw LLM Output";
     this.rawOutputContent = typeof message.content === "string" ? message.content : "";
-    openDialog(this.refs.rawDialog);
+    openDialog(resolveDialogRef(this.refs, "rawDialog", RAW_DIALOG_ELEMENT_ID));
   },
 
   closeRawDialog() {
-    closeDialog(this.refs.rawDialog);
+    closeDialog(resolveDialogRef(this.refs, "rawDialog", RAW_DIALOG_ELEMENT_ID));
   },
 
   async openPromptHistoryDialog() {
+    this.recordInteraction();
+
     try {
       const runtimeSystemPrompt = await this.refreshRuntimeSystemPrompt();
       this.promptHistoryMessages = agentApi.buildOnscreenAgentPromptMessages(runtimeSystemPrompt, this.history);
       const totalTokens = countTextTokens(formatPromptHistoryText(this.promptHistoryMessages));
       this.promptHistoryTitle = `Context window (${totalTokens.toLocaleString()} tokens)`;
       this.promptHistoryMode = "text";
-      openDialog(this.refs.historyDialog);
+      openDialog(resolveDialogRef(this.refs, "historyDialog", HISTORY_DIALOG_ELEMENT_ID));
     } catch (error) {
       this.status = error.message;
     }
   },
 
   closePromptHistoryDialog() {
-    closeDialog(this.refs.historyDialog);
+    closeDialog(resolveDialogRef(this.refs, "historyDialog", HISTORY_DIALOG_ELEMENT_ID));
   },
 
   setPromptHistoryMode(mode) {
@@ -1434,6 +1814,7 @@ const model = {
   },
 
   async handleClearClick() {
+    this.closeComposerActionMenu();
     this.closeRawDialog();
     this.rawOutputContent = "";
     this.clearComposerDraft();
@@ -1445,6 +1826,9 @@ const model = {
     this.stopRequested = false;
     this.activeRequestController?.abort();
     this.activeRequestController = null;
+    this.dismissUiBubble({
+      clearQueue: true
+    });
 
     if (this.currentChatRuntime?.attachments) {
       this.currentChatRuntime.attachments.clear();
@@ -1462,7 +1846,7 @@ const model = {
   },
 
   async streamAssistantResponse(requestMessages, assistantMessage) {
-    this.status = "Streaming response...";
+    this.status = "Thinking...";
     const runtimeSystemPrompt = await prompt.buildRuntimeOnscreenAgentSystemPrompt(this.systemPrompt, {
       defaultSystemPrompt: this.defaultSystemPrompt
     });
@@ -1477,6 +1861,7 @@ const model = {
         messages: requestMessages,
         onDelta: (delta) => {
           assistantMessage.content += delta;
+          this.setStreamingAssistantStatus(assistantMessage.content);
           this.scheduleStreamingMessageRender(assistantMessage);
         },
         signal: controller.signal
@@ -1652,13 +2037,12 @@ const model = {
 
   async executeAssistantBlocks(assistantContent) {
     const executionResults = await this.executionContext.executeFromContent(assistantContent, {
-      onBeforeBlock: async ({ index, total }) => {
+      onBeforeBlock: async ({ code, index, total }) => {
         if (!total) {
           return;
         }
 
-        this.status =
-          total === 1 ? "Executing browser code..." : `Executing browser code (${index + 1}/${total})...`;
+        this.status = getExecutionStatusText(code, index, total);
       }
     });
 
@@ -1729,6 +2113,10 @@ const model = {
         }
 
         const boundaryActionAfterResponse = this.getBoundaryAction();
+
+        if (streamResult.hasContent) {
+          this.showCompactAssistantReplyBubble(assistantMessage.content);
+        }
 
         if (boundaryActionAfterResponse) {
           return boundaryActionAfterResponse;

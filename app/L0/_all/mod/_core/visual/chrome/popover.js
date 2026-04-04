@@ -18,13 +18,21 @@ export function positionPopover(panel, anchor, options = {}) {
   const align = options.align === "start" ? "start" : "end";
   const gap = Number.isFinite(options.gap) ? options.gap : DEFAULT_GAP;
   const viewportMargin = Number.isFinite(options.viewportMargin) ? options.viewportMargin : DEFAULT_VIEWPORT_MARGIN;
+  const placement =
+    options.placement === "top" || options.placement === "bottom" ? options.placement : "auto";
   const anchorRect = anchor.getBoundingClientRect();
   const panelRect = panel.getBoundingClientRect();
+  const measuredPanelHeight = Math.max(MIN_POPOVER_HEIGHT, panelRect.height);
   const bottomSpace = globalThis.innerHeight - anchorRect.bottom - gap - viewportMargin;
   const topSpace = anchorRect.top - gap - viewportMargin;
-  const shouldOpenUpward = bottomSpace < panelRect.height && topSpace > bottomSpace;
+  const shouldOpenUpward =
+    placement === "top"
+      ? true
+      : placement === "bottom"
+        ? false
+        : bottomSpace < measuredPanelHeight && topSpace > bottomSpace;
   const maxHeight = Math.max(MIN_POPOVER_HEIGHT, shouldOpenUpward ? topSpace : bottomSpace);
-  const panelHeight = Math.min(panelRect.height, maxHeight);
+  const panelHeight = Math.min(measuredPanelHeight, maxHeight);
   const maximumLeft = Math.max(viewportMargin, globalThis.innerWidth - panelRect.width - viewportMargin);
   const maximumTop = Math.max(viewportMargin, globalThis.innerHeight - panelHeight - viewportMargin);
 
