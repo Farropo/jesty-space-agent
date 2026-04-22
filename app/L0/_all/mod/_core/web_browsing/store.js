@@ -66,6 +66,7 @@ const PERSISTED_BROWSER_WINDOWS_WRITE_DELAY_MS = 80;
 const ROUTER_STAGE_APPROX_MAX_WIDTH_REM = 84;
 const AGENT_BROWSER_INTERACTION_MESSAGE_TYPES = new Set([
   "click",
+  "evaluate",
   "history_back",
   "history_forward",
   "location_navigate",
@@ -646,6 +647,12 @@ function ensureBrowserRuntimeNamespace(store) {
     }),
     dom: guardAgentFunction(AGENT_FUNCTION_REQUIREMENT.NATIVE_APP_ONLY, (id, payload = null, options = {}) => {
       return performRuntimeBrowserRead(store, id, "dom", payload, options);
+    }),
+    evaluate: guardAgentFunction(AGENT_FUNCTION_REQUIREMENT.NATIVE_APP_ONLY, (id, scriptOrPayload = "", options = {}) => {
+      const payload = typeof scriptOrPayload === "string"
+        ? { script: scriptOrPayload }
+        : scriptOrPayload;
+      return performRuntimeBrowserRead(store, id, "evaluate", payload, options);
     }),
     focus: guardAgentFunction(AGENT_FUNCTION_REQUIREMENT.NATIVE_APP_ONLY, (id, options = {}) => {
       const normalizedId = requireWindowId(id);
