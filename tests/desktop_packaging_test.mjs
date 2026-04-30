@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -29,6 +30,9 @@ const {
   resolveDesktopUpdaterLogPath,
   resolveWindowsUpdaterInstallerArgs
 } = require("../packaging/desktop/updater_install_options.js");
+const {
+  readUpdateMetadata
+} = require("../packaging/scripts/release-metadata.js");
 const {
   LINUX_ARM64_RELEASE_METADATA_FILE,
   WINDOWS_RELEASE_METADATA_FILE,
@@ -264,6 +268,64 @@ test("packaged desktop updater detects Windows metadata that is missing the curr
       "x64"
     ),
     null
+  );
+});
+
+test("release metadata merge prefers Windows x64 metadata when builder output names collide", async (testContext) => {
+  const runtimeRoot = await fs.mkdtemp(path.join(os.tmpdir(), "space-release-metadata-"));
+  const x64MetadataDir = path.join(runtimeRoot, "windows-x64");
+  const arm64MetadataDir = path.join(runtimeRoot, "windows-arm64");
+  const x64MetadataPath = path.join(x64MetadataDir, "metadata-latest-windows.yml");
+  const arm64MetadataPath = path.join(arm64MetadataDir, "metadata-latest-windows.yml");
+  const mergedMetadataPath = path.join(runtimeRoot, "metadata-latest-windows.yml");
+
+  testContext.after(async () => {
+    await fs.rm(runtimeRoot, {
+      force: true,
+      recursive: true
+    });
+  });
+
+  await fs.mkdir(x64MetadataDir, { recursive: true });
+  await fs.mkdir(arm64MetadataDir, { recursive: true });
+  await fs.writeFile(
+    x64MetadataPath,
+    [
+      "version: 0.65.1",
+      "files:",
+      "  - url: Space Agent Setup 0.65.1.exe",
+      "    sha512: x64-sha",
+      "    size: 103220530"
+    ].join("\n"),
+    "utf8"
+  );
+  await fs.writeFile(
+    arm64MetadataPath,
+    [
+      "version: 0.65.1",
+      "files:",
+      "  - url: Space Agent Setup 0.65.1.exe",
+      "    sha512: arm64-sha",
+      "    size: 105151300"
+    ].join("\n"),
+    "utf8"
+  );
+
+  execFileSync(
+    process.execPath,
+    [path.join(PROJECT_ROOT, "packaging", "scripts", "release-metadata-merge.js"), runtimeRoot],
+    {
+      cwd: PROJECT_ROOT,
+      stdio: "pipe"
+    }
+  );
+  const merged = readUpdateMetadata(mergedMetadataPath);
+
+  assert.deepEqual(
+    merged.files.map((file) => [file.url, file.sha512, file.size]),
+    [
+      ["Space Agent Setup 0.65.1.exe", "x64-sha", "103220530"]
+    ]
   );
 });
 

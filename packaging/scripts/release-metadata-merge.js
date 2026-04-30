@@ -20,7 +20,16 @@ function collectMetadataFiles(rootDir, files, spec) {
   return files
     .filter((filePath) => path.basename(filePath) === spec.fileName)
     .filter((filePath) => platformDirPattern.test(toPosixPath(path.relative(rootDir, filePath))))
-    .sort();
+    .sort((left, right) => {
+      if (spec.platform !== "windows") {
+        return left.localeCompare(right);
+      }
+
+      const leftPath = toPosixPath(path.relative(rootDir, left));
+      const rightPath = toPosixPath(path.relative(rootDir, right));
+      const archRank = (value) => value.startsWith("windows-x64/") ? 0 : 1;
+      return archRank(leftPath) - archRank(rightPath) || leftPath.localeCompare(rightPath);
+    });
 }
 
 function copyCanonicalMetadata(inputPath, outputPath) {
