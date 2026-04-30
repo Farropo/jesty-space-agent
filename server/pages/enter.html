@@ -1178,8 +1178,62 @@
 
         applyUpdateState(runtimeInfo.updateStatus);
 
+        let automaticUpdateAction = null;
+
+        function runAutomaticDesktopUpdateAction(action) {
+          if (automaticUpdateAction) {
+            return;
+          }
+
+          automaticUpdateAction = Promise.resolve()
+            .then(action)
+            .catch((error) => {
+              resetLauncherExitFade();
+              const message = error instanceof Error ? error.message : String(error || "Desktop update failed.");
+              console.error("[space-enter] Automatic desktop update action failed.", error);
+              applyUpdateState({
+                ...currentUpdateState,
+                state: "error",
+                message
+              });
+            })
+            .finally(() => {
+              automaticUpdateAction = null;
+            });
+        }
+
+        function maybeRunAutomaticDesktopUpdate(nextState = {}) {
+          if (nextState.state === "update-available") {
+            runAutomaticDesktopUpdateAction(async () => {
+              applyUpdateState({
+                ...currentUpdateState,
+                state: "downloading",
+                message: "Downloading update..."
+              });
+
+              const result = await desktopApi.downloadUpdate();
+              if (result && result.ok === false && result.message) {
+                applyUpdateState({
+                  ...currentUpdateState,
+                  state: result.reason || "error",
+                  message: result.message
+                });
+              }
+            });
+            return;
+          }
+
+          if (nextState.state === "downloaded") {
+            runAutomaticDesktopUpdateAction(async () => {
+              await playLauncherExitFade();
+              await desktopApi.installUpdate();
+            });
+          }
+        }
+
         window.addEventListener("space-desktop:update-status", (event) => {
           applyUpdateState(event && event.detail);
+          maybeRunAutomaticDesktopUpdate(currentUpdateState);
         });
 
         desktopUpdateButton.addEventListener("click", async () => {
@@ -1233,6 +1287,8 @@
           } catch (error) {
             console.error("[space-enter] Automatic desktop update check failed.", error);
           }
+        } else {
+          maybeRunAutomaticDesktopUpdate(currentUpdateState);
         }
       }
 

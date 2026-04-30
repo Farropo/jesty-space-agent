@@ -35,6 +35,7 @@ Current module-local docs in the app tree:
 - `app/L0/_all/mod/_core/panels/AGENTS.md`
 - `app/L0/_all/mod/_core/login_hooks/AGENTS.md`
 - `app/L0/_all/mod/_core/memory/AGENTS.md`
+- `app/L0/_all/mod/_core/mission-control/AGENTS.md`
 - `app/L0/_all/mod/_core/promptinclude/AGENTS.md`
 - `app/L0/_all/mod/_core/router/AGENTS.md`
 - `app/L0/_all/mod/_core/skillset/AGENTS.md`
@@ -128,6 +129,7 @@ Current major first-party modules under `app/L0/_all/mod/_core/`:
 - `file_explorer/`: reusable app-file browser component, routed Files page, dashboard panel manifest, and routed header-menu item
 - `documentation/`: supplemental agent-facing documentation docs, the focused-read documentation helper, and the documentation skill that carries the top-level docs map
 - `memory/`: headless agent-memory policy module that auto-loads a top-level skill teaching prompt-include-backed user memory under `~/memory/behavior.system.include.md`, `~/memory/memories.transient.include.md`, and other `~/memory/*.transient.include.md` files
+- `mission-control/`: bundled `~/spaces/mission-control/` local machine dashboard, with dashboard bootstrap, `space.missionControl` browser helpers, and a routed `#/mission-control` inspector fallback backed by narrow server-owned OS inspection and registered-app control APIs
 - `panels/`: headless panel-manifest discovery plus the dashboard-injected Panels section, backed by permission-aware `ext/panels/*.yaml` metadata discovered through the app-file APIs and batch-read through the shared frontend file runtime
 - `promptinclude/`: headless promptinclude discovery and onscreen-agent prompt injection for readable `*.system.include.md` and `*.transient.include.md` app files
 - `onscreen_agent/`: floating routed overlay agent and the first-party user-facing chat runtime
@@ -333,6 +335,7 @@ Detailed visual subsystem rules now live in `app/L0/_all/mod/_core/visual/AGENTS
 - `agent/` owns the routed agent information page, its local avatar-card styling, and the user-local personality include editor for `~/conf/personality.system.include.md`; see `app/L0/_all/mod/_core/agent/AGENTS.md`
 - `file_explorer/` owns the reusable app-file browser component, routed Files page, dashboard panel manifest, and routed header-menu item; see `app/L0/_all/mod/_core/file_explorer/AGENTS.md`
 - `promptinclude/` owns readable prompt-include discovery through `file_paths` plus the onscreen-agent hooks that inject stable prompt-include instructions into the system prompt, append readable `*.system.include.md` file bodies there, and inject discovered `*.transient.include.md` file bodies into transient context; see `app/L0/_all/mod/_core/promptinclude/AGENTS.md`
+- `mission-control/` owns the bundled Mission Control Space template, dashboard bootstrap, routed inspector fallback, and `space.missionControl` helpers; see `app/L0/_all/mod/_core/mission-control/AGENTS.md`
 - `visual/` owns the shared visual system, reusable presentation primitives, and shared icon-selection modal helpers; see `app/L0/_all/mod/_core/visual/AGENTS.md`
 - `webllm/` owns the unlisted routed WebLLM browser-inference test surface, its route-local worker, and its vendored WebLLM browser runtime; see `app/L0/_all/mod/_core/webllm/AGENTS.md`
 - `huggingface/` owns the dashboard-listed Local LLM page, the routed Hugging Face Transformers.js browser-inference test surface, its shared browser-context manager and worker used by local admin or onscreen chat, and its vendored local browser-runtime shim; see `app/L0/_all/mod/_core/huggingface/AGENTS.md`

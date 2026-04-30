@@ -161,13 +161,22 @@ globalThis.spacesDashboardLauncher = function spacesDashboardLauncher() {
     loading: false,
     motionQuery: null,
     observedGridElement: null,
+    spacesChangedListener: null,
 
     async init() {
       this.motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+      this.spacesChangedListener = () => {
+        void this.loadSpaces();
+      };
+      window.addEventListener("space:spaces-changed", this.spacesChangedListener);
       await this.loadSpaces();
     },
 
     destroy() {
+      if (this.spacesChangedListener) {
+        window.removeEventListener("space:spaces-changed", this.spacesChangedListener);
+      }
+      this.spacesChangedListener = null;
       this.disconnectGridResizeObserver();
       this.stopEmptyTitleAnimation();
       window.cancelAnimationFrame(this.emptyTitleAnimationFrame);
