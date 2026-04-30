@@ -1,0 +1,23 @@
+schema: space-widget/v1
+id: system
+name: System
+cols: 5
+rows: 3
+col: 0
+row: 0
+renderer: |-
+  async (parent) => {
+    const { bytes, css, loadSnapshot } = await import("/mod/_core/mission-control/widget-runtime.js")
+    const root = css(parent)
+    const snapshot = await loadSnapshot()
+    const system = snapshot.providers?.system?.data || {}
+    const used = Math.max(0, Number(system.totalMemoryBytes || 0) - Number(system.freeMemoryBytes || 0))
+    const pct = system.totalMemoryBytes ? Math.round((used / system.totalMemoryBytes) * 100) : 0
+    root.innerHTML = `
+      <h3>System</h3>
+      <div class="row"><span class="muted">Host</span><strong>${system.hostname || "local"}</strong></div>
+      <div class="row"><span class="muted">Memory</span><strong>${pct}%</strong></div>
+      <div class="row"><span class="muted">Used</span><strong>${bytes(used)}</strong></div>
+      <div class="row"><span class="muted">CPU</span><strong>${system.cpuCount || 0} cores</strong></div>
+    `
+  }

@@ -1,0 +1,19 @@
+schema: space-widget/v1
+id: lm-studio
+name: LM Studio
+cols: 6
+rows: 3
+col: 0
+row: 3
+renderer: |-
+  async (parent) => {
+    const { css, loadSnapshot } = await import("/mod/_core/mission-control/widget-runtime.js")
+    const root = css(parent)
+    const snapshot = await loadSnapshot()
+    const provider = snapshot.providers?.lm_studio || {}
+    const models = provider.data?.models || []
+    root.innerHTML = `
+      <h3>LM Studio <span class="pill ${provider.status === "available" ? "ok" : "warn"}">${provider.status || "unknown"}</span></h3>
+      ${models.length ? models.slice(0, 8).map((m) => `<div class="row"><span>${m.id}</span><strong>${m.ownedBy || m.object || ""}</strong></div>`).join("") : `<p class="muted">${provider.reason || "No loaded models detected."}</p>`}
+    `
+  }

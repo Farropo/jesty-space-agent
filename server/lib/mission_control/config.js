@@ -83,6 +83,7 @@ export function getDefaultMissionControlConfig() {
   return {
     apps: [],
     modelPreferences: {
+      apiKey: "",
       fallbackModels: [
         "openai/gpt-oss-120b:free",
         "nvidia/nemotron-3-super-120b-a12b:free"
@@ -123,6 +124,12 @@ export function normalizeMissionControlConfig(input = {}) {
   return {
     apps,
     modelPreferences: {
+      apiKey: normalizeString(
+        modelPreferences.apiKey ||
+          modelPreferences.openRouterApiKey ||
+          modelPreferences.api_key,
+        8192
+      ),
       fallbackModels: fallbackModels.length
         ? fallbackModels
         : defaultConfig.modelPreferences.fallbackModels,
@@ -183,6 +190,11 @@ export function writeMissionControlConfig(context, input) {
     content: `${JSON.stringify(config, null, 2)}\n`,
     encoding: "utf8"
   }));
+
+  appendMissionControlAudit(context, {
+    action: "config_update",
+    appCount: config.apps.length
+  });
 
   return {
     config,

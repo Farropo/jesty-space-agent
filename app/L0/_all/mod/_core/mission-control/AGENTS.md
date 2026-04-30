@@ -14,8 +14,11 @@ This module owns:
 
 - `view.html`: routed Mission Control inspector and control surface.
 - `store.js`: Alpine store, `space.missionControl` runtime namespace, API calls, refresh loop, config editor, and app action orchestration.
+- `secrets.js`: frontend-only encryption/decryption helpers for Mission Control config secret fields.
 - `mission-control.css`: route-local responsive layout and operational dashboard styling.
-- `space-template.js`: installer for the bundled `mission-control` Space and its widgets.
+- `space-template.js`: installer for the bundled `mission-control` Space template assets.
+- `space-template/`: static `space.yaml` and `widgets/*.yaml` copied into `~/spaces/mission-control/`.
+- `widget-runtime.js`: shared widget renderer helpers for snapshots, styling, and formatting.
 - `dashboard-bootstrap.html` and `dashboard-bootstrap.js`: hidden dashboard bootstrap that installs the bundled Space and emits `space:spaces-changed`.
 - `ext/html/_core/dashboard/content_start/mission-control-space-bootstrap.html`: dashboard extension adapter for the bootstrap component.
 - `ext/skills/mission-control/SKILL.md`: page-context skill that teaches agents the safe Mission Control helpers.
@@ -50,7 +53,7 @@ The runtime namespace returns plain JSON and does not expose shell execution. Ap
 
 ## Space Template Contract
 
-`space-template.js` installs the bundled space into `~/spaces/mission-control/` through normal authenticated app-file writes. It writes a `space.yaml` manifest and YAML widget files under `widgets/`.
+`space-template.js` installs the bundled space into `~/spaces/mission-control/` through normal authenticated app-file writes. It copies static YAML assets from `space-template/` instead of generating YAML from JavaScript strings, and writes `data/template-version.txt` so older generated templates can be upgraded once.
 
 Current widgets cover:
 
@@ -69,5 +72,5 @@ Widget renderers import the route store when needed and call `space.missionContr
 - use `space.api.call(...)` through the store helpers instead of ad hoc fetch code
 - keep provider failures visible as degraded or unavailable states instead of crashing the route
 - keep user config editing explicit and local to the authenticated user's app files through the backend config API
-- do not store OpenRouter or other secrets in repo-tracked files; use encrypted user config when a later UI is added for secrets
+- do not store OpenRouter or other secrets in repo-tracked files; `modelPreferences.apiKey` is encrypted through `space.utils.userCrypto` before config writes when user crypto is available
 - if route, runtime namespace, app-control behavior, widget layout, or provider semantics change, update this file and the matching supplemental docs

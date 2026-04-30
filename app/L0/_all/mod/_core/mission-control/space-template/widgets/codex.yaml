@@ -1,0 +1,17 @@
+schema: space-widget/v1
+id: codex
+name: Codex
+cols: 6
+rows: 3
+col: 6
+row: 3
+renderer: |-
+  async (parent) => {
+    const { css, loadSnapshot } = await import("/mod/_core/mission-control/widget-runtime.js")
+    const root = css(parent)
+    const snapshot = await loadSnapshot()
+    const proc = snapshot.providers?.codex?.data?.processes || []
+    root.innerHTML = "<h3>Codex</h3>" + (proc.length ? proc.slice(0, 8).map((p) => `
+      <div class="row"><span>${p.name}</span><strong>PID ${p.pid}</strong></div>
+    `).join("") : '<p class="muted">No Codex processes detected.</p>')
+  }

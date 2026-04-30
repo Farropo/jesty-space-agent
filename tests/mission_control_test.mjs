@@ -9,12 +9,22 @@ import {
   normalizeMissionControlConfig
 } from "../server/lib/mission_control/config.js";
 import {
+  providerResult
+} from "../server/lib/mission_control/providers/common.js";
+import {
   isLocalHttpUrl,
   normalizeLocalHttpUrl
 } from "../server/lib/mission_control/local_url.js";
 import {
   parseLmStudioModels
 } from "../server/lib/mission_control/service.js";
+import {
+  decryptMissionControlSecrets,
+  encryptMissionControlSecrets
+} from "../app/L0/_all/mod/_core/mission-control/secrets.js";
+import {
+  ensureMissionControlSpace
+} from "../app/L0/_all/mod/_core/mission-control/space-template.js";
 import { createAgentServer } from "../server/app.js";
 
 function listen(server, port = 0, host = "127.0.0.1") {
@@ -67,6 +77,15 @@ test("mission control config validation keeps app control explicit", () => {
   assert.equal(config.apps[0].healthUrl, "http://127.0.0.1:3000/");
   assert.equal(config.apps[0].stopMode, "external");
   assert.equal(config.refreshIntervalMs, 1500);
+  assert.equal(
+    normalizeMissionControlConfig({
+      modelPreferences: {
+        apiKey: "userCrypto:sealed",
+        selectedModel: "qwen/qwen3-next-80b-a3b-instruct:free"
+      }
+    }).modelPreferences.apiKey,
+    "userCrypto:sealed"
+  );
 
   assert.throws(
     () => normalizeMissionControlConfig({
@@ -79,12 +98,89 @@ test("mission control config validation keeps app control explicit", () => {
   );
 });
 
+test("mission control provider results expose normalized availability", () => {
+  assert.deepEqual(providerResult("demo", "available", { ok: true }), {
+    available: true,
+    data: { ok: true },
+    name: "demo",
+    reason: "",
+    status: "available"
+  });
+  assert.equal(providerResult("demo", "degraded").available, false);
+});
+
 test("mission control URL validation only accepts localhost http URLs", () => {
   assert.equal(isLocalHttpUrl("http://localhost:5173"), true);
   assert.equal(isLocalHttpUrl("https://127.0.0.1:8443/path"), true);
   assert.equal(normalizeLocalHttpUrl("http://127.0.0.1:8000"), "http://127.0.0.1:8000/");
   assert.equal(isLocalHttpUrl("https://example.com"), false);
   assert.equal(isLocalHttpUrl("file:///C:/tmp/x"), false);
+});
+
+test("mission control encrypts and decrypts frontend-only secret config fields", async () => {
+  const runtime = {
+    utils: {
+      userCrypto: {
+        decryptText: async (value) => Buffer.from(String(value).replace(/^userCrypto:/u, ""), "base64").toString("utf8"),
+        encryptText: async (value) => `userCrypto:${Buffer.from(String(value)).toString("base64")}`
+      }
+    }
+  };
+  const encrypted = await encryptMissionControlSecrets({
+    modelPreferences: {
+      apiKey: "sk-test",
+      selectedModel: "qwen/qwen3-next-80b-a3b-instruct:free"
+    }
+  }, runtime);
+
+  assert.match(encrypted.modelPreferences.apiKey, /^userCrypto:/u);
+
+  const decrypted = await decryptMissionControlSecrets(encrypted, runtime);
+  assert.equal(decrypted.modelPreferences.apiKey, "sk-test");
+});
+
+test("mission control installs its Space from static YAML template assets", async (testContext) => {
+  const previousFetch = globalThis.fetch;
+  const previousSpace = globalThis.space;
+  const writes = [];
+
+  testContext.after(() => {
+    globalThis.fetch = previousFetch;
+    globalThis.space = previousSpace;
+  });
+
+  globalThis.fetch = async (url) => ({
+    ok: true,
+    status: 200,
+    text: async () => `template:${url}`
+  });
+  globalThis.space = {
+    api: {
+      fileInfo: async () => {
+        const error = new Error("File not found.");
+        error.statusCode = 404;
+        throw error;
+      },
+      fileWrite: async (payload) => {
+        writes.push(payload);
+        return { ok: true };
+      }
+    }
+  };
+
+  const result = await ensureMissionControlSpace({ open: false });
+  const files = writes[0]?.files || [];
+
+  assert.equal(result.id, "mission-control");
+  assert.equal(result.installed, true);
+  assert.ok(files.some((file) => file.path === "~/spaces/mission-control/space.yaml"));
+  assert.ok(files.some((file) => file.path === "~/spaces/mission-control/widgets/system.yaml"));
+  assert.ok(files.some((file) => file.path === "~/spaces/mission-control/data/template-version.txt"));
+  assert.ok(
+    files
+      .filter((file) => !String(file.path || "").endsWith("data/template-version.txt"))
+      .every((file) => String(file.content || "").startsWith("template:/mod/_core/mission-control/space-template/"))
+  );
 });
 
 test("mission control parses LM Studio model payloads", () => {
@@ -178,6 +274,13 @@ test("mission control APIs save config, probe localhost, and start or stop track
   });
   assert.equal(probe.response.status, 200);
   assert.equal(probe.body.probe.title, "Mission Probe");
+
+  const snapshotResponse = await fetch(`${runtime.browserUrl}/api/mission_control_snapshot`);
+  const snapshot = await snapshotResponse.json();
+  assert.equal(snapshotResponse.status, 200);
+  assert.ok(snapshot.providers.system.available);
+  assert.equal(typeof snapshot.providers.processes.status, "string");
+  assert.ok(Array.isArray(snapshot.registeredApps));
 
   const externalProbe = await postJson("/api/mission_control_probe", {
     url: "https://example.com/"

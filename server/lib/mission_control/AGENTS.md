@@ -14,7 +14,8 @@ This subtree owns:
 
 - `config.js`: Mission Control user config normalization, storage under `~/conf/mission-control.json`, and audit append writes under `~/hist/mission-control.jsonl`.
 - `local_url.js`: localhost-only HTTP URL normalization and validation.
-- `service.js`: provider collection, snapshot assembly, registered-app start/stop/restart, localhost probing, LM Studio model parsing, and app-control audit entries.
+- `service.js`: thin snapshot orchestration and public service exports for the API adapters.
+- `providers/`: modular provider and app-control implementations for OS facts and actions.
 
 Endpoint files under `server/api/mission_control_*.js` are thin adapters over this library. Frontend files under `_core/mission-control/` own presentation and browser runtime helpers.
 
@@ -24,7 +25,6 @@ Providers are best-effort. Each provider returns a normalized envelope:
 
 - `status`: `available`, `degraded`, or `unavailable`
 - `available`: boolean
-- `summary`: short human-readable status
 - `data`: provider-specific plain JSON
 - `reason`: present when the provider is degraded or unavailable
 
@@ -55,7 +55,9 @@ Current audit path:
 
 - `~/hist/mission-control.jsonl`
 
-Registered apps are normalized to explicit fields: `id`, `label`, `cwd`, `executable`, `args`, `env`, `envAllowlist`, `healthUrl`, `stopMode`, and `tags`.
+Registered apps are normalized to explicit fields: `id`, `label`, `cwd`, `executable`, `args`, `env`, `healthUrl`, `stopMode`, and `tags`.
+
+Frontend-only secrets such as `modelPreferences.apiKey` may be present in config, but the browser should encrypt them with `space.utils.userCrypto` before writing when user crypto is available. The backend stores and returns the value as opaque text; it must not need the OpenRouter key for Mission Control's current OS inspection and app-control work.
 
 Safety rules:
 

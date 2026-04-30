@@ -1,0 +1,17 @@
+schema: space-widget/v1
+id: ports
+name: Ports
+cols: 6
+rows: 3
+col: 0
+row: 6
+renderer: |-
+  async (parent) => {
+    const { css, loadSnapshot } = await import("/mod/_core/mission-control/widget-runtime.js")
+    const root = css(parent)
+    const snapshot = await loadSnapshot()
+    const ports = snapshot.providers?.ports?.data?.localhost || []
+    root.innerHTML = "<h3>Listening Ports</h3>" + ports.slice(0, 10).map((p) => `
+      <div class="row"><span>:${p.port} ${p.name || ""}</span><strong>PID ${p.pid}</strong></div>
+    `).join("")
+  }

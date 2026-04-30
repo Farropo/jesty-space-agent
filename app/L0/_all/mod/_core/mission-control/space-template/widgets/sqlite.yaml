@@ -1,0 +1,17 @@
+schema: space-widget/v1
+id: sqlite
+name: SQLite
+cols: 6
+rows: 3
+col: 6
+row: 6
+renderer: |-
+  async (parent) => {
+    const { css, loadSnapshot } = await import("/mod/_core/mission-control/widget-runtime.js")
+    const root = css(parent)
+    const snapshot = await loadSnapshot()
+    const dbs = snapshot.providers?.sqlite?.data?.inspected || []
+    root.innerHTML = "<h3>SQLite</h3>" + (dbs.length ? dbs.slice(0, 8).map((db) => `
+      <div class="row"><span>${db.path}</span><strong>${db.inspection?.tables?.length || 0} tables</strong></div>
+    `).join("") : '<p class="muted">No SQLite files found.</p>')
+  }

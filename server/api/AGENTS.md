@@ -129,6 +129,7 @@ Current rules:
 - these endpoints are authenticated and delegate to `server/lib/mission_control/`
 - snapshots return provider envelopes where optional OS-tool failures degrade individual providers instead of failing the full request
 - config endpoints read and write the current user's `~/conf/mission-control.json` through normalized user app-file storage
+- config updates append local audit entries; frontend-only secret fields such as `modelPreferences.apiKey` should already be browser-encrypted before write
 - app action endpoints accept registered app ids only, never raw command text
 - app action responses wrap the lifecycle result under `operation` because top-level `status`, `headers`, `body`, and `stream` are reserved by the router's explicit HTTP response shape
 - `mission_control_probe` accepts only `http` or `https` localhost URLs and returns the result under `probe`

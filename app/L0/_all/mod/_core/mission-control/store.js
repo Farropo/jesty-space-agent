@@ -2,6 +2,10 @@ import {
   ensureMissionControlSpace,
   MISSION_CONTROL_SPACE_ID
 } from "/mod/_core/mission-control/space-template.js";
+import {
+  decryptMissionControlSecrets,
+  encryptMissionControlSecrets
+} from "/mod/_core/mission-control/secrets.js";
 
 const SNAPSHOT_CACHE = {
   at: 0,
@@ -55,16 +59,27 @@ async function fetchSnapshot(options = {}) {
   return SNAPSHOT_CACHE.promise;
 }
 
-async function fetchConfig() {
-  return getApi().call("mission_control_config_get", {
+async function fetchConfig(options = {}) {
+  const result = await getApi().call("mission_control_config_get", {
     method: "GET"
   });
+
+  if (options.decryptSecrets === true && result?.config) {
+    return {
+      ...result,
+      config: await decryptMissionControlSecrets(result.config)
+    };
+  }
+
+  return result;
 }
 
 async function updateConfig(config) {
+  const safeConfig = await encryptMissionControlSecrets(config);
+
   return getApi().call("mission_control_config_update", {
     body: {
-      config
+      config: safeConfig
     },
     method: "POST"
   });

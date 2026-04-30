@@ -1,0 +1,41 @@
+schema: spaces/v2
+id: mission-control
+title: Mission Control
+icon: space_dashboard
+icon_color: "#6ee7b7"
+created_at: 2026-04-30T00:00:00.000Z
+updated_at: 2026-04-30T00:00:00.000Z
+agent_instructions: |
+  This space is the local mission-control surface for the user's PC and development runtime.
+  Use space.missionControl helpers for live telemetry, registered app control, local probes, and config checks.
+layout:
+  system:
+    col: 0
+    row: 0
+    cols: 5
+    rows: 3
+  localhost:
+    col: 5
+    row: 0
+    cols: 7
+    rows: 3
+  lm-studio:
+    col: 0
+    row: 3
+    cols: 6
+    rows: 3
+  codex:
+    col: 6
+    row: 3
+    cols: 6
+    rows: 3
+  ports:
+    col: 0
+    row: 6
+    cols: 6
+    rows: 3
+  sqlite:
+    col: 6
+    row: 6
+    cols: 6
+    rows: 3

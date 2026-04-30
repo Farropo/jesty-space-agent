@@ -28,7 +28,7 @@ Current authenticated endpoints:
 
 `mission_control_snapshot` returns a provider map plus generated timestamp and config summary. Provider failures are represented as `degraded` or `unavailable` entries rather than route-wide failures.
 
-`mission_control_config_get` and `mission_control_config_update` read and write the current user's `~/conf/mission-control.json` through normalized config helpers.
+`mission_control_config_get` and `mission_control_config_update` read and write the current user's `~/conf/mission-control.json` through normalized config helpers. Config updates append a local audit entry. Frontend-only secret fields such as `modelPreferences.apiKey` should arrive already encrypted as `userCrypto:` payloads when user crypto is available; the backend stores them as opaque strings.
 
 App action endpoints accept app ids, not command text. Their JSON response wraps the lifecycle result in `operation` to avoid colliding with the router's HTTP response-shape keys.
 
@@ -42,4 +42,5 @@ App action endpoints accept app ids, not command text. Their JSON response wraps
 - app starts use `shell: false`
 - external PID stops require confirmation plus registered executable or cwd signature matching
 - mutations append audit entries under `~/hist/mission-control.jsonl`
+- the backend does not decrypt or use OpenRouter API keys for Mission Control
 - optional OS tooling failures degrade individual providers, not the full snapshot
