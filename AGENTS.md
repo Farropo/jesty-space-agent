@@ -91,6 +91,7 @@ App docs:
 - `/app/L0/_all/mod/_core/huggingface/AGENTS.md`
 - `/app/L0/_all/mod/_core/login_hooks/AGENTS.md`
 - `/app/L0/_all/mod/_core/memory/AGENTS.md`
+- `/app/L0/_all/mod/_core/mission-control/AGENTS.md`
 - `/app/L0/_all/mod/_core/onscreen_agent/AGENTS.md`
 - `/app/L0/_all/mod/_core/onscreen_agent/prompts/AGENTS.md`
 - `/app/L0/_all/mod/_core/onscreen_menu/AGENTS.md`
@@ -123,6 +124,7 @@ Server docs:
 - `/server/lib/customware/AGENTS.md`
 - `/server/lib/file_watch/AGENTS.md`
 - `/server/lib/git/AGENTS.md`
+- `/server/lib/mission_control/AGENTS.md`
 - `/server/lib/share/AGENTS.md`
 - `/server/lib/tmp/AGENTS.md`
 - `/server/pages/AGENTS.md`
@@ -173,7 +175,7 @@ These rules apply across the codebase:
 Top-level structure:
 
 - `space`: root CLI router that discovers command modules dynamically
-- `.github/`: repo-level automation, tagged desktop release publishing, and lightweight public assets used by the README, including hero, badge, and video thumbnail artwork
+- `.github/`: repo-level automation, tagged desktop release publishing, automatic upstream-sync and fork-release automation, and lightweight public assets used by the README, including hero, badge, and video thumbnail artwork
 - `.vscode/`: workspace editor settings plus the checked-in `npm run dev` debugger launch config for server-side breakpoints during local development
 - `commands/`: CLI command modules such as `serve`, `help`, `get`, `set`, `version`, and `update`
 - `app/`: browser runtime, layered customware model, shared frontend modules, and browser test surfaces

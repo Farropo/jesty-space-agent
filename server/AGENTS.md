@@ -34,6 +34,7 @@ Current subsystem-local docs in the server tree:
 - `server/lib/share/AGENTS.md`
 - `server/lib/tmp/AGENTS.md`
 - `server/lib/git/AGENTS.md`
+- `server/lib/mission_control/AGENTS.md`
 
 Update rules:
 
@@ -121,6 +122,7 @@ Current server layout:
 - `server/lib/share/`: backend-owned hosted-share archive storage, ZIP validation, authenticated import, and anonymous guest-clone helpers
 - `server/lib/tmp/`: `server/tmp/` lifecycle, stale-entry cleanup, and low-RAM ZIP archive creation for attachment-style downloads
 - `server/lib/git/`: Git backend abstraction used by update flows and Git-backed module installs
+- `server/lib/mission_control/`: Mission Control provider collection, localhost URL policy, user config normalization, audit logging, and registered-app lifecycle control for the local dashboard
 - `server/tmp/`: transient disk-backed artifacts such as folder-download ZIP files
 
 ## Request Flow And Runtime Contracts
@@ -190,6 +192,7 @@ The server relies on a small set of shared infrastructure contracts. Do not re-i
 - `server/lib/utils/project_version.js` is the canonical project-version resolver for both the CLI version command and page-shell version display
 - `app/L0/_all/mod/_core/framework/js/yaml-lite.js` is the canonical YAML parser and serializer for both browser and server code; server modules import it directly instead of maintaining a duplicate server-side helper
 - `server/lib/customware/layout.js` is the canonical logical-to-disk resolver for repo `L0` and configured writable `L1`/`L2` roots
+- `server/lib/mission_control/` is the canonical backend boundary for Mission Control snapshots and registered-app control; endpoints should delegate to it instead of duplicating OS probes, localhost URL validation, config writes, or audit behavior
 
 Infrastructure rules:
 
@@ -228,6 +231,7 @@ Current endpoint families:
 - app files: `file_list`, `file_paths`, `file_read`, `file_write`, `file_delete`, `file_copy`, `file_move`, `file_info`, `folder_download`
 - local history: `git_history_list`, `git_history_diff`, `git_history_preview`, `git_history_rollback`, `git_history_revert`
 - modules: `module_list`, `module_info`, `module_install`, `module_remove`
+- mission control: `mission_control_snapshot`, `mission_control_config_get`, `mission_control_config_update`, `mission_control_app_start`, `mission_control_app_stop`, `mission_control_app_restart`, `mission_control_probe`
 - runtime and identity: `extensions_load`, `debug_path_index`, `password_generate`, `password_change`, `user_crypto_session_key`, `user_self_info`
 
 `file_write` still defaults to whole-file replacement, but it now also supports append, prepend, and text-insert mutations through the shared file-access layer, so browser callers can update ordinary text files incrementally without fetching and rewriting the full file every time.

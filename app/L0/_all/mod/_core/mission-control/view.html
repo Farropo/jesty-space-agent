@@ -1,0 +1,303 @@
+<html>
+  <head>
+    <link rel="stylesheet" href="/mod/_core/visual/index.css" />
+    <link rel="stylesheet" href="/mod/_core/mission-control/mission-control.css" />
+    <script type="module" src="/mod/_core/mission-control/store.js"></script>
+  </head>
+  <body>
+    <div x-data>
+      <template x-if="$store.missionControl">
+        <section
+          class="mission-control-page"
+          x-cloak
+          x-init="$store.missionControl.init()"
+          x-destroy="$store.missionControl.destroy()"
+        >
+          <x-context data-tags="mission-control"></x-context>
+
+          <header class="mission-control-header">
+            <div class="mission-control-title">
+              <p class="page-eyebrow">Local Mission Control</p>
+              <h1>Jesty Mission Control</h1>
+              <div class="mission-control-meta">
+                <span x-text="$store.missionControl.generatedAtLabel ? `Updated ${$store.missionControl.generatedAtLabel}` : 'Waiting for telemetry'"></span>
+                <span x-text="`${$store.missionControl.configAppCount} managed apps`"></span>
+              </div>
+            </div>
+
+            <div class="mission-control-actions">
+              <button
+                type="button"
+                class="secondary-button mission-icon-button"
+                :disabled="$store.missionControl.loading"
+                @click="$store.missionControl.refresh({ force: true })"
+                title="Refresh"
+              >
+                <x-icon x-text="$store.missionControl.loading ? 'hourglass_top' : 'refresh'"></x-icon>
+              </button>
+              <button
+                type="button"
+                class="secondary-button"
+                @click="$store.missionControl.showConfig = !$store.missionControl.showConfig"
+              >
+                <x-icon>tune</x-icon>
+                <span>Config</span>
+              </button>
+              <button
+                type="button"
+                class="primary-button"
+                :disabled="$store.missionControl.installingSpace"
+                @click="$store.missionControl.installSpace()"
+              >
+                <x-icon x-text="$store.missionControl.installingSpace ? 'hourglass_top' : 'dashboard_customize'"></x-icon>
+                <span>Open Space</span>
+              </button>
+            </div>
+          </header>
+
+          <template x-if="$store.missionControl.errorText || $store.missionControl.lastActionText">
+            <div
+              class="mission-banner"
+              :class="{ 'is-error': $store.missionControl.errorText }"
+              x-text="$store.missionControl.errorText || $store.missionControl.lastActionText"
+            ></div>
+          </template>
+
+          <section class="mission-config" x-show="$store.missionControl.showConfig" x-cloak>
+            <div class="mission-section-heading">
+              <div>
+                <h2>Config</h2>
+                <p x-text="$store.missionControl.configResult?.path || '~/conf/mission-control.json'"></p>
+              </div>
+              <div class="mission-heading-actions">
+                <button type="button" class="secondary-button" @click="$store.missionControl.loadConfig()">
+                  <x-icon>refresh</x-icon>
+                  <span>Reload</span>
+                </button>
+                <button
+                  type="button"
+                  class="primary-button"
+                  :disabled="$store.missionControl.savingConfig"
+                  @click="$store.missionControl.saveConfig()"
+                >
+                  <x-icon x-text="$store.missionControl.savingConfig ? 'hourglass_top' : 'save'"></x-icon>
+                  <span>Save</span>
+                </button>
+              </div>
+            </div>
+            <textarea
+              class="mission-config-editor"
+              spellcheck="false"
+              x-model="$store.missionControl.configText"
+            ></textarea>
+          </section>
+
+          <section class="mission-grid">
+            <article class="mission-tile mission-tile--wide">
+              <div class="mission-section-heading">
+                <div>
+                  <h2>System</h2>
+                  <p x-text="$store.missionControl.system.hostname || 'Local host'"></p>
+                </div>
+                <span class="mission-status" :class="$store.missionControl.statusClass('system')" x-text="$store.missionControl.providerStatus('system')"></span>
+              </div>
+              <div class="mission-metrics">
+                <div>
+                  <span>Memory</span>
+                  <strong x-text="`${$store.missionControl.memoryPercent}%`"></strong>
+                  <small x-text="`${$store.missionControl.formatBytes($store.missionControl.memoryUsedBytes)} / ${$store.missionControl.formatBytes($store.missionControl.system.totalMemoryBytes)}`"></small>
+                </div>
+                <div>
+                  <span>CPU</span>
+                  <strong x-text="$store.missionControl.system.cpuCount || 0"></strong>
+                  <small x-text="$store.missionControl.system.cpuModel || 'n/a'"></small>
+                </div>
+                <div>
+                  <span>Uptime</span>
+                  <strong x-text="$store.missionControl.formatDuration($store.missionControl.system.uptimeSeconds)"></strong>
+                  <small x-text="$store.missionControl.system.release || ''"></small>
+                </div>
+              </div>
+              <div class="mission-list mission-list--compact">
+                <template x-for="disk in $store.missionControl.disks" :key="disk.id">
+                  <div class="mission-row">
+                    <span x-text="disk.id"></span>
+                    <strong x-text="`${$store.missionControl.formatBytes(disk.freeBytes)} free`"></strong>
+                  </div>
+                </template>
+              </div>
+            </article>
+
+            <article class="mission-tile mission-tile--wide">
+              <div class="mission-section-heading">
+                <div>
+                  <h2>Managed Apps</h2>
+                  <p>Registered local processes</p>
+                </div>
+                <span class="mission-count" x-text="$store.missionControl.registeredApps.length"></span>
+              </div>
+              <template x-if="!$store.missionControl.registeredApps.length">
+                <p class="mission-empty">No managed apps registered.</p>
+              </template>
+              <div class="mission-app-list">
+                <template x-for="app in $store.missionControl.registeredApps" :key="app.id">
+                  <div class="mission-app">
+                    <div class="mission-app-main">
+                      <span class="mission-dot" :class="{ 'is-on': app.isRunning }"></span>
+                      <div>
+                        <strong x-text="app.label"></strong>
+                        <small x-text="app.pid ? `PID ${app.pid}` : app.id"></small>
+                      </div>
+                    </div>
+                    <div class="mission-app-actions">
+                      <button type="button" class="secondary-button mission-icon-button" :disabled="$store.missionControl.actionAppId" @click="$store.missionControl.handleAppAction('start', app)" title="Start">
+                        <x-icon>play_arrow</x-icon>
+                      </button>
+                      <button type="button" class="secondary-button mission-icon-button" :disabled="$store.missionControl.actionAppId || !app.isRunning" @click="$store.missionControl.handleAppAction('stop', app)" title="Stop">
+                        <x-icon>stop</x-icon>
+                      </button>
+                      <button type="button" class="secondary-button mission-icon-button" :disabled="$store.missionControl.actionAppId" @click="$store.missionControl.handleAppAction('restart', app)" title="Restart">
+                        <x-icon>restart_alt</x-icon>
+                      </button>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </article>
+
+            <article class="mission-tile">
+              <div class="mission-section-heading">
+                <div>
+                  <h2>Localhost</h2>
+                  <p>Reachable HTTP surfaces</p>
+                </div>
+                <span class="mission-status" :class="$store.missionControl.statusClass('localhost_http')" x-text="$store.missionControl.providerStatus('localhost_http')"></span>
+              </div>
+              <div class="mission-list">
+                <template x-for="probe in $store.missionControl.reachableHttp" :key="probe.url">
+                  <a class="mission-row mission-link-row" :href="probe.url" target="_blank" rel="noreferrer">
+                    <span x-text="probe.title || probe.url"></span>
+                    <strong x-text="probe.status"></strong>
+                  </a>
+                </template>
+              </div>
+            </article>
+
+            <article class="mission-tile">
+              <div class="mission-section-heading">
+                <div>
+                  <h2>Ports</h2>
+                  <p>Developer listeners</p>
+                </div>
+                <span class="mission-status" :class="$store.missionControl.statusClass('ports')" x-text="$store.missionControl.providerStatus('ports')"></span>
+              </div>
+              <div class="mission-list">
+                <template x-for="port in $store.missionControl.highlightedPorts" :key="`${port.pid}-${port.port}`">
+                  <div class="mission-row">
+                    <span x-text="`${port.name || 'process'} :${port.port}`"></span>
+                    <strong x-text="`PID ${port.pid}`"></strong>
+                  </div>
+                </template>
+              </div>
+            </article>
+
+            <article class="mission-tile">
+              <div class="mission-section-heading">
+                <div>
+                  <h2>LM Studio</h2>
+                  <p>OpenAI-compatible local API</p>
+                </div>
+                <span class="mission-status" :class="$store.missionControl.statusClass('lm_studio')" x-text="$store.missionControl.providerStatus('lm_studio')"></span>
+              </div>
+              <p class="mission-provider-reason" x-show="$store.missionControl.providerReason('lm_studio')" x-text="$store.missionControl.providerReason('lm_studio')"></p>
+              <div class="mission-list">
+                <template x-for="model in $store.missionControl.lmStudioModels" :key="model.id">
+                  <div class="mission-row">
+                    <span x-text="model.id"></span>
+                    <strong x-text="model.ownedBy || model.object"></strong>
+                  </div>
+                </template>
+              </div>
+            </article>
+
+            <article class="mission-tile">
+              <div class="mission-section-heading">
+                <div>
+                  <h2>Codex</h2>
+                  <p>Desktop and app-server processes</p>
+                </div>
+                <span class="mission-status" :class="$store.missionControl.statusClass('codex')" x-text="$store.missionControl.providerStatus('codex')"></span>
+              </div>
+              <div class="mission-list">
+                <template x-for="proc in $store.missionControl.codexProcesses" :key="proc.pid">
+                  <div class="mission-row">
+                    <span x-text="proc.name"></span>
+                    <strong x-text="`PID ${proc.pid}`"></strong>
+                  </div>
+                </template>
+              </div>
+            </article>
+
+            <article class="mission-tile">
+              <div class="mission-section-heading">
+                <div>
+                  <h2>SQLite</h2>
+                  <p>Read-only discovery</p>
+                </div>
+                <span class="mission-status" :class="$store.missionControl.statusClass('sqlite')" x-text="$store.missionControl.providerStatus('sqlite')"></span>
+              </div>
+              <div class="mission-list">
+                <template x-for="db in $store.missionControl.inspectedSqlite" :key="db.path">
+                  <div class="mission-row mission-row--stack">
+                    <span x-text="db.path"></span>
+                    <strong x-text="`${db.inspection?.tables?.length || 0} tables`"></strong>
+                  </div>
+                </template>
+              </div>
+            </article>
+
+            <article class="mission-tile">
+              <div class="mission-section-heading">
+                <div>
+                  <h2>Services</h2>
+                  <p>Windows services and Docker</p>
+                </div>
+                <span class="mission-status" :class="$store.missionControl.statusClass('docker')" x-text="$store.missionControl.providerStatus('docker')"></span>
+              </div>
+              <div class="mission-list">
+                <div class="mission-row">
+                  <span>Docker</span>
+                  <strong x-text="$store.missionControl.docker.data?.info?.serverVersion || $store.missionControl.docker.reason || 'n/a'"></strong>
+                </div>
+                <template x-for="service in $store.missionControl.services.slice(0, 8)" :key="service.name">
+                  <div class="mission-row">
+                    <span x-text="service.displayName || service.name"></span>
+                    <strong x-text="service.status"></strong>
+                  </div>
+                </template>
+              </div>
+            </article>
+
+            <article class="mission-tile">
+              <div class="mission-section-heading">
+                <div>
+                  <h2>Network</h2>
+                  <p>Adapter counters</p>
+                </div>
+                <span class="mission-status" :class="$store.missionControl.statusClass('network')" x-text="$store.missionControl.providerStatus('network')"></span>
+              </div>
+              <div class="mission-list">
+                <template x-for="adapter in $store.missionControl.networkStats.slice(0, 8)" :key="adapter.name">
+                  <div class="mission-row">
+                    <span x-text="adapter.name"></span>
+                    <strong x-text="$store.missionControl.formatBytes(adapter.receivedBytes + adapter.sentBytes)"></strong>
+                  </div>
+                </template>
+              </div>
+            </article>
+          </section>
+        </section>
+      </template>
+    </div>
+  </body>
+</html>

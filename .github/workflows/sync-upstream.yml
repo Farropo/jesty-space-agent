@@ -1,0 +1,164 @@
+name: Sync Upstream
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 7 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream-main
+  cancel-in-progress: false
+
+jobs:
+  sync-upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out fork
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/agent0ai/space-agent.git
+          git fetch origin main --tags
+          git fetch upstream main --tags
+
+      - id: merge
+        name: Merge upstream into main
+        shell: bash
+        run: |
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Already up to date with upstream."
+            exit 0
+          fi
+
+          set +e
+          git merge --no-ff --no-edit upstream/main
+          merge_status=$?
+          set -e
+
+          if [ "$merge_status" -ne 0 ]; then
+            echo "Merge conflicts detected. Resolving conflicted paths with upstream versions."
+            conflicted_paths="$(git diff --name-only --diff-filter=U)"
+            if [ -n "$conflicted_paths" ]; then
+              while IFS= read -r path; do
+                [ -n "$path" ] || continue
+                git checkout --theirs -- "$path"
+                git add "$path"
+              done <<< "$conflicted_paths"
+            fi
+            git commit --no-edit
+          fi
+
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Preserve fork release channel
+        if: steps.merge.outputs.changed == 'true'
+        run: |
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const path = "package.json";
+          const pkg = JSON.parse(fs.readFileSync(path, "utf8"));
+          pkg.repository = {
+            ...(pkg.repository || {}),
+            type: "git",
+            url: "https://github.com/Farropo/jesty-space-agent.git"
+          };
+          pkg.build = pkg.build || {};
+          pkg.build.publish = {
+            ...(pkg.build.publish || {}),
+            provider: "github",
+            owner: "Farropo",
+            repo: "jesty-space-agent",
+            releaseType: "release"
+          };
+          fs.writeFileSync(path, `${JSON.stringify(pkg, null, 2)}\n`);
+          NODE
+
+          if ! git diff --quiet -- package.json; then
+            git add package.json
+            git commit -m "Preserve fork desktop update channel"
+          fi
+
+      - name: Install dependencies
+        if: steps.merge.outputs.changed == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Run smoke tests
+        if: steps.merge.outputs.changed == 'true'
+        run: |
+          npm ci --omit=optional
+          node --test tests/mission_control_test.mjs tests/file_api_request_context_test.mjs tests/module_discovery_state_test.mjs
+
+      - id: tag
+        name: Create automatic release tag
+        if: steps.merge.outputs.changed == 'true'
+        shell: bash
+        run: |
+          release_tag="$(node - <<'NODE'
+          const { execFileSync } = require("node:child_process");
+          const pkg = require("./package.json");
+
+          function parse(value) {
+            const match = String(value || "").trim().match(/^v?(\d+)\.(\d+)(?:\.(\d+))?$/);
+            if (!match) {
+              return null;
+            }
+            return {
+              major: Number(match[1]),
+              minor: Number(match[2]),
+              patch: Number(match[3] || "0")
+            };
+          }
+
+          function compare(left, right) {
+            return left.major - right.major || left.minor - right.minor || left.patch - right.patch;
+          }
+
+          function format(version) {
+            return `v${version.major}.${version.minor}.${version.patch}`;
+          }
+
+          const base = parse(pkg.version) || { major: 0, minor: 1, patch: 0 };
+          const rawTags = execFileSync("git", ["tag", "--list", "v*"], { encoding: "utf8" })
+            .split(/\s+/)
+            .map((tag) => ({ tag, version: parse(tag) }))
+            .filter((entry) => entry.version);
+          const existing = new Set(rawTags.map((entry) => entry.tag));
+          const baseTag = format(base);
+
+          if (!existing.has(baseTag)) {
+            process.stdout.write(baseTag);
+            return;
+          }
+
+          const latest = rawTags.reduce((best, entry) => compare(best.version, entry.version) >= 0 ? best : entry, rawTags[0]);
+          const next = { ...latest.version, patch: latest.version.patch + 1 };
+          process.stdout.write(format(next));
+          NODE
+          )"
+
+          git tag "$release_tag"
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Push synced main and release tag
+        if: steps.merge.outputs.changed == 'true'
+        run: |
+          git push origin HEAD:main
+          git push origin "${{ steps.tag.outputs.release_tag }}"

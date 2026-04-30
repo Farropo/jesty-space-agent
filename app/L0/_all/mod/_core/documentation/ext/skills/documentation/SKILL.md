@@ -32,6 +32,7 @@ recommended starting points
 - browser-side Hugging Face testing: `app/huggingface-browser-runtime.md`
 - browser-side WebLLM testing: `app/webllm-browser-runtime.md`
 - spaces and widgets: `app/spaces-and-widgets.md`
+- Mission Control dashboard: `app/mission-control.md`
 - overlay agent runtime: `agent/onscreen-agent-runtime.md`
 - memory or promptinclude-backed agent memory: `agent/memory-and-prompt-includes.md`
 - prompt or execution protocol: `agent/prompt-and-execution.md`
@@ -40,6 +41,7 @@ recommended starting points
 - server jobs or maintenance loops: `server/jobs-and-maintenance.md`
 - app-file APIs: `server/api/files.md`
 - module, login, or runtime endpoints: `server/api/modules-and-runtime.md`
+- Mission Control endpoints: `server/api/mission-control.md`
 - auth and sessions: `server/auth-and-sessions.md`
 - layered filesystem, `CUSTOMWARE_PATH`, or writable-layer history: `server/customware-layers-and-paths.md`
 - CLI commands or runtime params: `cli/commands-and-runtime-params.md`
@@ -54,6 +56,7 @@ app/modules-and-extensions.md|Modules And Extensions|`/mod/...` delivery, router
 app/huggingface-browser-runtime.md|Hugging Face Browser Runtime|The routed Transformers.js test surface, its worker split, direct Hub model loading contract, and throughput metrics.
 app/webllm-browser-runtime.md|WebLLM Browser Runtime|The routed WebLLM test surface, its worker split, model-loading modes, and throughput metrics contract.
 app/spaces-and-widgets.md|Spaces And Widgets|Space storage, widget renderer contracts, widget-shell defaults, and the main `space.current` / `space.spaces` helpers.
+app/mission-control.md|Mission Control|The bundled local machine Space, `space.missionControl` helpers, inspector route, and config safety rules.
 agent/onscreen-agent-runtime.md|Onscreen Agent Runtime|Overlay ownership, persistence, defaults, UI/runtime surfaces, and prompt file ownership.
 agent/memory-and-prompt-includes.md|Memory And Prompt Includes|Prompt-include-backed persistent memory workflow, standard `~/memory` files, and the memory-skill contract.
 agent/prompt-and-execution.md|Prompt And Execution|Prompt assembly order, message markers, execution transcript rules, and compaction behavior.
@@ -62,6 +65,7 @@ server/request-flow-and-pages.md|Request Flow And Pages|Exact server routing ord
 server/jobs-and-maintenance.md|Jobs And Maintenance|Primary-owned periodic jobs, interval scheduling, mutation publishing, and guest cleanup maintenance rules.
 server/api/files.md|File APIs|The authenticated file endpoints, path forms, writable discovery, folder downloads, and optional local history APIs.
 server/api/modules-and-runtime.md|Module And Runtime APIs|Module endpoints, login/runtime endpoints, `extensions_load`, and identity helpers.
+server/api/mission-control.md|Mission Control APIs|Mission Control snapshot, config, localhost probe, and registered-app control endpoints plus their safety contract.
 server/auth-and-sessions.md|Auth And Sessions|User storage layout, sealed password/session records, and login/runtime auth behavior.
 server/customware-layers-and-paths.md|Customware Layers And Paths|Logical-versus-disk paths, permission rules, optional writable-layer history, override order, and `maxLayer`.
 cli/commands-and-runtime-params.md|Commands And Runtime Params|`space.js`, command families, runtime-param precedence, and the current schema surface.

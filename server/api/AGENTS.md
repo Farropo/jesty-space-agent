@@ -114,6 +114,26 @@ Current rules:
 - writable operations must reuse the shared permission model and publish concrete changed logical paths through the shared mutation flow so the primary refreshes replicated module state
 - when `USER_FOLDER_SIZE_LIMIT_BYTES` is positive, new `module_install` writes into `L2/<user>/` are measured in a system temp directory and quota-checked before the module tree is moved into the user folder
 
+Mission Control endpoints:
+
+- `mission_control_snapshot`
+- `mission_control_config_get`
+- `mission_control_config_update`
+- `mission_control_app_start`
+- `mission_control_app_stop`
+- `mission_control_app_restart`
+- `mission_control_probe`
+
+Current rules:
+
+- these endpoints are authenticated and delegate to `server/lib/mission_control/`
+- snapshots return provider envelopes where optional OS-tool failures degrade individual providers instead of failing the full request
+- config endpoints read and write the current user's `~/conf/mission-control.json` through normalized user app-file storage
+- app action endpoints accept registered app ids only, never raw command text
+- app action responses wrap the lifecycle result under `operation` because top-level `status`, `headers`, `body`, and `stream` are reserved by the router's explicit HTTP response shape
+- `mission_control_probe` accepts only `http` or `https` localhost URLs and returns the result under `probe`
+- app starts must use `shell: false`, external PID stops require explicit confirmation plus executable or cwd signature matching, and mutations append local audit entries under `~/hist/mission-control.jsonl`
+
 Runtime and identity endpoints:
 
 - `extensions_load`

@@ -21,7 +21,7 @@ This module owns:
 - `onboarding/first-login-onboarding.js`: spaces-owned first-login onboarding helper that copies or reuses the initial Big Bang onboarding space and rewrites the main-shell landing route before router default-to-dashboard behavior runs
 - `onboarding/onboarding_space/`: module-owned first-login onboarding space template folder copied into the user's writable spaces area when they have no spaces yet; `space.yaml` in this folder owns the initial title, icon, color, and agent instructions
 - `widget-content.css`: widget-body markdown and shared content presentation for rendered widget output
-- `dashboard-launcher.html`, `dashboard-launcher.js`, and `dashboard-launcher.css`: dashboard-injected spaces launcher surface
+- `dashboard-launcher.html`, `dashboard-launcher.js`, and `dashboard-launcher.css`: dashboard-injected spaces launcher surface, including the `space:spaces-changed` window event listener used by other modules after they install or mutate spaces
 - `dashboard-actions.js`: shared dashboard-level create-space action helper reused by the launcher and topbar control
 - `dashboard-topbar-new-space.html` and `dashboard-topbar-new-space.js`: dashboard topbar New Space control
 - `constants.js`: stable route, filesystem, schema, and widget-size constants for this module
@@ -90,6 +90,7 @@ Current files and folders:
 - when an unnamed space needs a generated folder id, allocate it from the numbered `space-1`, `space-2`, `space-3` sequence; do not derive ids from placeholder UI copy, and do not synthesize a stored title during creation
 - when the first widget is added to a space whose stored title is still empty, promote that widget name into the initial persisted space title instead of leaving the space unnamed forever
 - `listSpaces()` should enumerate manifests by recursively listing the authenticated user's `~/spaces/` root and selecting `spaces/<spaceId>/space.yaml`; if that root does not exist yet, treat it as the normal empty-state case instead of surfacing an error in the dashboard launcher
+- dashboard-time space installers may dispatch a `space:spaces-changed` window event after they write space files; the dashboard Spaces launcher should respond by reloading its list without those installers reaching into launcher internals
 - `listSpaces()` should then batch-read the discovered `space.yaml` files plus YAML widget files in one `space.api.fileRead(...)` call and keep a short-lived in-memory per-space snapshot so an immediate direct-route reload can reuse the already-read current space instead of fetching it again
 - `duplicateSpace(...)` should clone an existing `~/spaces/<spaceId>/` tree through the authenticated file-copy API into a new unique folder id, then rewrite only the copied manifest metadata that must change for the clone such as `id` and timestamps
 - `removeSpace(...)` should delete the entire `~/spaces/<spaceId>/` tree recursively instead of trying to remove files piecemeal from the dashboard launcher
