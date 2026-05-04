@@ -12,12 +12,19 @@ import {
   providerResult
 } from "../server/lib/mission_control/providers/common.js";
 import {
+  identifyMissionControlService
+} from "../server/lib/mission_control/providers/service_catalog.js";
+import {
   isLocalHttpUrl,
   normalizeLocalHttpUrl
 } from "../server/lib/mission_control/local_url.js";
 import {
+  loadLmStudioModel,
   parseLmStudioModels
 } from "../server/lib/mission_control/service.js";
+import {
+  startLmStudioServer
+} from "../server/lib/mission_control/providers/lm_studio.js";
 import {
   decryptMissionControlSecrets,
   encryptMissionControlSecrets
@@ -184,21 +191,124 @@ test("mission control installs its Space from static YAML template assets", asyn
 });
 
 test("mission control parses LM Studio model payloads", () => {
-  assert.deepEqual(
-    parseLmStudioModels({
-      data: [
-        { id: "qwen/qwen3", object: "model", owned_by: "lm-studio" },
-        { id: "", object: "model" }
-      ]
-    }),
-    [
+  const native = parseLmStudioModels({
+    models: [
       {
-        id: "qwen/qwen3",
-        object: "model",
-        ownedBy: "lm-studio"
+        display_name: "Qwen3 4B",
+        key: "qwen/qwen3-4b",
+        loaded_instances: [{ id: "qwen/qwen3-4b:1" }],
+        params_string: "4B",
+        quantization: { bits_per_weight: 4, name: "Q4_K_M" },
+        selected_variant: "qwen/qwen3-4b@q4_k_m",
+        size_bytes: 1234,
+        type: "llm"
       }
     ]
+  });
+  assert.equal(native[0].id, "qwen/qwen3-4b");
+  assert.equal(native[0].displayName, "Qwen3 4B");
+  assert.equal(native[0].loaded, true);
+  assert.equal(native[0].loadable, true);
+  assert.equal(native[0].quantization.name, "Q4_K_M");
+
+  const compatible = parseLmStudioModels({
+    data: [
+      { id: "qwen/qwen3", object: "model", owned_by: "lm-studio" },
+      { id: "", object: "model" }
+    ]
+  });
+  assert.equal(compatible.length, 1);
+  assert.equal(compatible[0].id, "qwen/qwen3");
+  assert.equal(compatible[0].ownedBy, "lm-studio");
+  assert.equal(compatible[0].source, "openai-compatible");
+});
+
+test("mission control service catalog identifies local services", () => {
+  assert.equal(
+    identifyMissionControlService({
+      headers: { "x-syncthing-id": "abc" },
+      port: 8384
+    }).label,
+    "Syncthing"
   );
+  assert.equal(
+    identifyMissionControlService({
+      bodySnippet: "Hermes Gateway Adapter - OK",
+      port: 18789
+    }).label,
+    "Hermes Gateway Adapter"
+  );
+  assert.equal(
+    identifyMissionControlService({
+      title: "Codex Request Gateway"
+    }).label,
+    "Codex Request Gateway"
+  );
+  assert.equal(
+    identifyMissionControlService({
+      name: "svchost.exe",
+      port: 135
+    }).label,
+    "Windows Service Host"
+  );
+  assert.equal(
+    identifyMissionControlService({
+      name: "System",
+      port: 445
+    }).label,
+    "Windows System"
+  );
+  assert.equal(
+    identifyMissionControlService({
+      port: 43210
+    }).source,
+    "fallback"
+  );
+});
+
+test("mission control LM Studio actions use fixed local boundaries", async () => {
+  const loadCalls = [];
+  const loadResult = await loadLmStudioModel("qwen/qwen3-4b", {
+    fetchImpl: async (url, options = {}) => {
+      loadCalls.push({ body: options.body, method: options.method, url });
+
+      if (String(url).endsWith("/api/v1/models/load")) {
+        return {
+          ok: true,
+          json: async () => ({ status: "loaded" })
+        };
+      }
+
+      return {
+        ok: true,
+        json: async () => ({ models: [] })
+      };
+    },
+    timeoutMs: 50
+  });
+  assert.equal(loadResult.status, "loaded");
+  assert.equal(JSON.parse(loadCalls.at(-1).body).model, "qwen/qwen3-4b");
+
+  let serverReady = false;
+  const startResult = await startLmStudioServer({
+    fetchImpl: async () => {
+      if (!serverReady) {
+        throw new Error("not ready");
+      }
+
+      return {
+        ok: true,
+        json: async () => ({ models: [] })
+      };
+    },
+    runner: async (_command, args) => {
+      assert.deepEqual(args, ["server", "start", "--port", "1234"]);
+      serverReady = true;
+      return { stderr: "", stdout: "started" };
+    },
+    timeoutMs: 50
+  });
+  assert.equal(startResult.status, "started");
 });
 
 test("mission control APIs save config, probe localhost, and start or stop tracked apps", async (testContext) => {

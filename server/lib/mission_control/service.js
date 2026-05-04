@@ -1,6 +1,7 @@
 import os from "node:os";
 
 import {
+  appendMissionControlAudit,
   readMissionControlConfig,
   summarizeMissionControlConfig
 } from "./config.js";
@@ -20,7 +21,9 @@ import {
 } from "./providers/localhost_http.js";
 import {
   collectLmStudio,
-  parseLmStudioModels
+  loadLmStudioModel,
+  parseLmStudioModels,
+  startLmStudioServer
 } from "./providers/lm_studio.js";
 import { collectPorts } from "./providers/ports.js";
 import { collectProcesses } from "./providers/processes.js";
@@ -33,12 +36,39 @@ import {
 import { collectWindowsServices } from "./providers/windows_services.js";
 
 export {
+  loadLmStudioModel,
   parseLmStudioModels,
   probeLocalHttp,
   restartMissionControlApp,
   startMissionControlApp,
+  startLmStudioServer,
   stopMissionControlApp
 };
+
+export async function startMissionControlLmStudio(context) {
+  const operation = await startLmStudioServer();
+
+  appendMissionControlAudit(context, {
+    action: "lm_studio_start",
+    port: operation.port,
+    status: operation.status
+  });
+
+  return operation;
+}
+
+export async function loadMissionControlLmStudioModel(context, payload = {}) {
+  const modelId = payload.modelId || payload.model || payload.id;
+  const operation = await loadLmStudioModel(modelId);
+
+  appendMissionControlAudit(context, {
+    action: "lm_studio_model_load",
+    modelId: operation.modelId,
+    status: operation.status
+  });
+
+  return operation;
+}
 
 export async function createMissionControlSnapshot(context) {
   const configResult = readMissionControlConfig(context);

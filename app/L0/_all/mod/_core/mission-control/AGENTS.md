@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`_core/mission-control/` owns the first-party local machine dashboard for the user's PC and development environment.
+`_core/mission-control/` owns Jesty's Mission Control, the first-party local machine dashboard for the user's PC and development environment.
 
 It provides a bundled Space template installed under the authenticated user's `~/spaces/mission-control/` folder, dashboard bootstrap that keeps that Space present, a browser runtime API at `space.missionControl`, and a routed inspector fallback at `#/mission-control?inspect=1`. The frontend stays the primary product surface; server APIs are narrow OS-inspection and registered-app control boundaries that the browser cannot enforce safely by itself.
 
@@ -45,11 +45,13 @@ Current runtime namespace:
 - `space.missionControl.startApp(appId)`
 - `space.missionControl.stopApp(appId, { confirmed?, pid? })`
 - `space.missionControl.restartApp(appId, { confirmed?, pid? })`
+- `space.missionControl.startLmStudio()`
+- `space.missionControl.loadLmStudioModel(modelId)`
 - `space.missionControl.probe(url)`
 - `space.missionControl.ensureSpace(options)`
 - `space.missionControl.installSpace(options)`
 
-The runtime namespace returns plain JSON and does not expose shell execution. App-control helpers accept app ids, not command text.
+The runtime namespace returns plain JSON and does not expose shell execution. App-control helpers accept app ids, not command text. LM Studio helpers are fixed local actions for the default port 1234 server and selected model ids only.
 
 ## Space Template Contract
 
@@ -57,11 +59,11 @@ The runtime namespace returns plain JSON and does not expose shell execution. Ap
 
 Current widgets cover:
 
-- system load
-- localhost apps and probes
-- LM Studio
+- system load, CPU usage, and top memory processes
+- localhost apps and probes with built-in service labels
+- LM Studio server state and model loading
 - Codex processes
-- listening ports
+- listening ports with short process/service explanations
 - SQLite files
 
 Widget renderers import the route store when needed and call `space.missionControl.snapshot(...)`. They should stay read-only and should not duplicate backend provider logic.

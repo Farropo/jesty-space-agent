@@ -52,12 +52,24 @@ export async function collectProcesses() {
       { maxBuffer: 16 * 1024 * 1024 }
     ));
     const processes = rows.map(normalizeProcessRow).filter((entry) => entry.pid > 0);
+    const topMemory = [...processes]
+      .filter((entry) => entry.workingSetBytes > 0)
+      .sort((left, right) => right.workingSetBytes - left.workingSetBytes)
+      .slice(0, 4)
+      .map((entry) => ({
+        commandLine: entry.commandLine,
+        executablePath: entry.executablePath,
+        name: entry.name,
+        pid: entry.pid,
+        workingSetBytes: entry.workingSetBytes
+      }));
 
     return providerResult("processes", "available", {
       codex: processes.filter((entry) => entry.isCodex).slice(0, 20),
       devServers: processes.filter((entry) => entry.isDevServer).slice(0, 30),
       lmStudio: processes.filter((entry) => entry.isLmStudio).slice(0, 20),
       processes,
+      topMemory,
       total: processes.length
     });
   } catch (error) {

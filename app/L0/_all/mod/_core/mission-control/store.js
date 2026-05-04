@@ -119,6 +119,23 @@ async function restartApp(appId, options = {}) {
   return result?.operation || result;
 }
 
+async function startLmStudio() {
+  const result = await getApi().call("mission_control_lm_studio_start", {
+    method: "POST"
+  });
+  return result?.operation || result;
+}
+
+async function loadLmStudioModel(modelId) {
+  const result = await getApi().call("mission_control_lm_studio_model_load", {
+    body: {
+      modelId
+    },
+    method: "POST"
+  });
+  return result?.operation || result;
+}
+
 async function probe(url) {
   return getApi().call("mission_control_probe", {
     body: {
@@ -136,11 +153,13 @@ function ensureRuntimeNamespace() {
     config: fetchConfig,
     ensureSpace: ensureMissionControlSpace,
     installSpace: ensureMissionControlSpace,
+    loadLmStudioModel,
     probe,
     refresh: (options = {}) => fetchSnapshot({ ...options, force: true }),
     restartApp,
     snapshot: fetchSnapshot,
     startApp,
+    startLmStudio,
     stopApp
   };
 }
@@ -234,6 +253,7 @@ const model = {
   installingSpace: false,
   lastActionText: "",
   loading: false,
+  lmStudioActionId: "",
   redirectingToSpace: false,
   refreshTimer: 0,
   savingConfig: false,
@@ -306,12 +326,7 @@ const model = {
   },
 
   get highlightedPorts() {
-    return this.ports
-      .filter((entry) => {
-        const text = `${entry.name || ""} ${entry.commandLine || ""}`.toLowerCase();
-        return text.includes("node") || text.includes("python") || text.includes("vite") || text.includes("uvicorn") || text.includes("lm studio");
-      })
-      .slice(0, 12);
+    return this.ports.slice(0, 16);
   },
 
   get reachableHttp() {
@@ -329,6 +344,10 @@ const model = {
 
   get lmStudioModels() {
     return this.lmStudio.data?.models || [];
+  },
+
+  get topMemoryProcesses() {
+    return dataOf(this.snapshot, "processes", {}).topMemory || [];
   },
 
   get codex() {
@@ -384,6 +403,20 @@ const model = {
 
   providerReason(name) {
     return provider(this.snapshot, name).reason || "";
+  },
+
+  modelTitle(model = {}) {
+    return model.displayName || model.id || "model";
+  },
+
+  modelMeta(model = {}) {
+    const parts = [
+      model.paramsString,
+      model.quantization?.name,
+      model.loaded ? "loaded" : "not loaded"
+    ].filter(Boolean);
+
+    return parts.join(" / ");
   },
 
   formatBytes,
@@ -479,6 +512,49 @@ const model = {
       this.errorText = String(error?.message || `Unable to ${action} ${appId}.`);
     } finally {
       this.actionAppId = "";
+    }
+  },
+
+  async handleLmStudioStart() {
+    if (this.lmStudioActionId) {
+      return;
+    }
+
+    this.lmStudioActionId = "start";
+    this.errorText = "";
+    this.lastActionText = "";
+
+    try {
+      const result = await startLmStudio();
+      this.lastActionText = `LM Studio: ${result.status || "started"}`;
+      await this.refresh({ force: true });
+    } catch (error) {
+      logMissionControlError("LM Studio start failed", error);
+      this.errorText = String(error?.message || "Unable to start LM Studio.");
+    } finally {
+      this.lmStudioActionId = "";
+    }
+  },
+
+  async handleLmStudioModelLoad(model = {}) {
+    const modelId = String(model.id || model.key || "").trim();
+    if (!modelId || this.lmStudioActionId) {
+      return;
+    }
+
+    this.lmStudioActionId = modelId;
+    this.errorText = "";
+    this.lastActionText = "";
+
+    try {
+      const result = await loadLmStudioModel(modelId);
+      this.lastActionText = `LM Studio: ${result.modelId || modelId} ${result.status || "loaded"}`;
+      await this.refresh({ force: true });
+    } catch (error) {
+      logMissionControlError("LM Studio model load failed", error);
+      this.errorText = String(error?.message || `Unable to load ${modelId}.`);
+    } finally {
+      this.lmStudioActionId = "";
     }
   },
 

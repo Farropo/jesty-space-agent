@@ -1,5 +1,5 @@
 ---
-name: Mission Control
+name: Jesty's Mission Control
 description: Inspect local PC telemetry, registered localhost apps, LM Studio, SQLite, services, Docker, and Codex status
 metadata:
   when:
@@ -11,12 +11,13 @@ metadata:
   placement: system
 ---
 
-Use this skill on the Mission Control route or inside the Mission Control Space.
+Use this skill on the Jesty's Mission Control route or inside the Mission Control Space.
 
 runtime
 - `space.missionControl.snapshot({ force?, cacheMs? })` returns the live backend snapshot.
 - `space.missionControl.config({ decryptSecrets?: true })` reads `~/conf/mission-control.json`.
 - `space.missionControl.startApp(id)`, `stopApp(id, options?)`, and `restartApp(id, options?)` act only on registered app ids.
+- `space.missionControl.startLmStudio()` and `loadLmStudioModel(modelId)` expose fixed local LM Studio actions for port 1234.
 - `space.missionControl.probe(url)` accepts only localhost http(s) URLs.
 - `space.missionControl.ensureSpace()` installs and opens `~/spaces/mission-control`.
 

@@ -7,13 +7,28 @@ col: 0
 row: 3
 renderer: |-
   async (parent) => {
-    const { css, loadSnapshot } = await import("/mod/_core/mission-control/widget-runtime.js")
+    const { css, escapeHtml, loadSnapshot } = await import("/mod/_core/mission-control/widget-runtime.js")
     const root = css(parent)
     const snapshot = await loadSnapshot()
     const provider = snapshot.providers?.lm_studio || {}
     const models = provider.data?.models || []
     root.innerHTML = `
-      <h3>LM Studio <span class="pill ${provider.status === "available" ? "ok" : "warn"}">${provider.status || "unknown"}</span></h3>
-      ${models.length ? models.slice(0, 8).map((m) => `<div class="row"><span>${m.id}</span><strong>${m.ownedBy || m.object || ""}</strong></div>`).join("") : `<p class="muted">${provider.reason || "No loaded models detected."}</p>`}
+      <h3>LM Studio <span class="pill ${provider.status === "available" ? "ok" : "warn"}">${escapeHtml(provider.status || "unknown")}</span> <button type="button" data-start-lm>Start</button></h3>
+      ${models.length ? models.slice(0, 8).map((m) => `<div class="row">
+        <span class="main"><strong>${escapeHtml(m.displayName || m.id)}</strong><small>${escapeHtml([m.paramsString, m.quantization?.name, m.loaded ? "loaded" : "not loaded"].filter(Boolean).join(" / "))}</small></span>
+        ${m.loadable && !m.loaded ? `<button type="button" data-load-model="${escapeHtml(m.id)}">Load</button>` : `<strong>${m.loaded ? "loaded" : escapeHtml(m.ownedBy || m.object || "")}</strong>`}
+      </div>`).join("") : `<p class="muted">${escapeHtml(provider.reason || "No models detected.")}</p>`}
     `
+    root.querySelector("[data-start-lm]")?.addEventListener("click", async (event) => {
+      event.currentTarget.disabled = true
+      await globalThis.space.missionControl.startLmStudio()
+      await globalThis.space.missionControl.refresh()
+    })
+    root.querySelectorAll("[data-load-model]").forEach((button) => {
+      button.addEventListener("click", async (event) => {
+        event.currentTarget.disabled = true
+        await globalThis.space.missionControl.loadLmStudioModel(event.currentTarget.dataset.loadModel)
+        await globalThis.space.missionControl.refresh()
+      })
+    })
   }

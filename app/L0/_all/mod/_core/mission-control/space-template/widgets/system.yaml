@@ -7,10 +7,11 @@ col: 0
 row: 0
 renderer: |-
   async (parent) => {
-    const { bytes, css, loadSnapshot } = await import("/mod/_core/mission-control/widget-runtime.js")
+    const { bytes, css, escapeHtml, loadSnapshot } = await import("/mod/_core/mission-control/widget-runtime.js")
     const root = css(parent)
     const snapshot = await loadSnapshot()
     const system = snapshot.providers?.system?.data || {}
+    const topMemory = snapshot.providers?.processes?.data?.topMemory || []
     const used = Math.max(0, Number(system.totalMemoryBytes || 0) - Number(system.freeMemoryBytes || 0))
     const pct = system.totalMemoryBytes ? Math.round((used / system.totalMemoryBytes) * 100) : 0
     root.innerHTML = `
@@ -18,6 +19,7 @@ renderer: |-
       <div class="row"><span class="muted">Host</span><strong>${system.hostname || "local"}</strong></div>
       <div class="row"><span class="muted">Memory</span><strong>${pct}%</strong></div>
       <div class="row"><span class="muted">Used</span><strong>${bytes(used)}</strong></div>
-      <div class="row"><span class="muted">CPU</span><strong>${system.cpuCount || 0} cores</strong></div>
+      <div class="row"><span class="muted">CPU</span><strong>${system.cpuUsagePercent === null || system.cpuUsagePercent === undefined ? "n/a" : `${system.cpuUsagePercent}%`}</strong></div>
+      ${topMemory.slice(0, 4).map((proc) => `<div class="row"><span>${escapeHtml(proc.name || "process")}</span><strong>${bytes(proc.workingSetBytes)}</strong></div>`).join("")}
     `
   }

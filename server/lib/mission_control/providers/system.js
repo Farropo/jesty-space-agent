@@ -8,6 +8,29 @@ import {
   toNumber
 } from "./common.js";
 
+async function collectCpuUsagePercent() {
+  if (!isWindows()) {
+    return null;
+  }
+
+  try {
+    const rows = normalizePowerShellRows(await runPowerShellJson(
+      "Get-CimInstance Win32_Processor | Select-Object LoadPercentage"
+    ));
+    const values = rows
+      .map((row) => toNumber(row.LoadPercentage, -1))
+      .filter((value) => value >= 0);
+
+    if (!values.length) {
+      return null;
+    }
+
+    return Math.round(values.reduce((total, value) => total + value, 0) / values.length);
+  } catch {
+    return null;
+  }
+}
+
 export async function collectSystem() {
   const cpus = os.cpus() || [];
   const loadAverage = os.loadavg();
@@ -16,6 +39,7 @@ export async function collectSystem() {
     arch: os.arch(),
     cpuCount: cpus.length,
     cpuModel: cpus[0]?.model || "",
+    cpuUsagePercent: await collectCpuUsagePercent(),
     freeMemoryBytes: os.freemem(),
     hostname: os.hostname(),
     loadAverage,

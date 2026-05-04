@@ -8,12 +8,21 @@ export async function loadSnapshot() {
 export function css(parent) {
   parent.style.cssText = "width:100%;height:100%;box-sizing:border-box;overflow:auto;color:#edf5ff;background:#0d1827;border-radius:8px;padding:12px;font:13px/1.35 system-ui,Segoe UI,sans-serif;";
   const style = document.createElement("style");
-  style.textContent = ".mcw h3{margin:0 0 10px;font-size:14px}.mcw .row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid rgba(151,188,255,.14)}.mcw .muted{color:rgba(225,236,255,.66)}.mcw strong{font-weight:700}.mcw a{color:#9bc7ff;text-decoration:none}.mcw .pill{display:inline-flex;border:1px solid rgba(151,188,255,.2);border-radius:999px;padding:2px 7px;color:#bcd3ff}.mcw .ok{color:#6ee7b7}.mcw .warn{color:#facc15}.mcw .bad{color:#fb7185}";
+  style.textContent = ".mcw h3{margin:0 0 10px;font-size:14px}.mcw .row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid rgba(151,188,255,.14)}.mcw .stack{align-items:flex-start;flex-direction:column;gap:2px}.mcw .main{display:flex;min-width:0;flex:1 1 auto;flex-direction:column;gap:2px}.mcw .muted,.mcw small{color:rgba(225,236,255,.66)}.mcw small{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis}.mcw strong{font-weight:700}.mcw a{color:#9bc7ff;text-decoration:none}.mcw button{border:1px solid rgba(151,188,255,.22);border-radius:6px;padding:3px 8px;background:rgba(255,255,255,.05);color:#edf5ff;font:inherit;cursor:pointer}.mcw button:disabled{cursor:default;opacity:.55}.mcw .pill{display:inline-flex;border:1px solid rgba(151,188,255,.2);border-radius:999px;padding:2px 7px;color:#bcd3ff}.mcw .ok{color:#6ee7b7}.mcw .warn{color:#facc15}.mcw .bad{color:#fb7185}";
   parent.appendChild(style);
   const root = document.createElement("div");
   root.className = "mcw";
   parent.appendChild(root);
   return root;
+}
+
+export function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 export function bytes(value) {

@@ -1,12 +1,12 @@
 schema: spaces/v2
 id: mission-control
-title: Mission Control
+title: Jesty's Mission Control
 icon: space_dashboard
 icon_color: "#6ee7b7"
 created_at: 2026-04-30T00:00:00.000Z
 updated_at: 2026-04-30T00:00:00.000Z
 agent_instructions: |
-  This space is the local mission-control surface for the user's PC and development runtime.
+  This space is Jesty's Mission Control, the local surface for the user's PC and development runtime.
   Use space.missionControl helpers for live telemetry, registered app control, local probes, and config checks.
 layout:
   system:

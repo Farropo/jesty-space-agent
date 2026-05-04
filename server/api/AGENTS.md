@@ -122,6 +122,8 @@ Mission Control endpoints:
 - `mission_control_app_start`
 - `mission_control_app_stop`
 - `mission_control_app_restart`
+- `mission_control_lm_studio_start`
+- `mission_control_lm_studio_model_load`
 - `mission_control_probe`
 
 Current rules:
@@ -131,6 +133,7 @@ Current rules:
 - config endpoints read and write the current user's `~/conf/mission-control.json` through normalized user app-file storage
 - config updates append local audit entries; frontend-only secret fields such as `modelPreferences.apiKey` should already be browser-encrypted before write
 - app action endpoints accept registered app ids only, never raw command text
+- LM Studio action endpoints expose only fixed local server start and selected-model load operations; they do not accept arbitrary CLI args or URLs
 - app action responses wrap the lifecycle result under `operation` because top-level `status`, `headers`, `body`, and `stream` are reserved by the router's explicit HTTP response shape
 - `mission_control_probe` accepts only `http` or `https` localhost URLs and returns the result under `probe`
 - app starts must use `shell: false`, external PID stops require explicit confirmation plus executable or cwd signature matching, and mutations append local audit entries under `~/hist/mission-control.jsonl`

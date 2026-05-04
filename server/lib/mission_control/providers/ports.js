@@ -5,21 +5,33 @@ import {
   runPowerShellJson,
   toNumber
 } from "./common.js";
+import { identifyMissionControlService } from "./service_catalog.js";
 
 function normalizePortRow(row = {}, processByPid = new Map()) {
   const pid = toNumber(row.OwningProcess || row.pid);
   const processInfo = processByPid.get(pid) || null;
   const address = String(row.LocalAddress || row.address || "");
   const port = toNumber(row.LocalPort || row.port);
+  const identity = identifyMissionControlService({
+    address,
+    commandLine: processInfo?.commandLine || "",
+    name: processInfo?.name || "",
+    port,
+    process: processInfo
+  });
 
   return {
     address,
     commandLine: processInfo?.commandLine || "",
+    confidence: identity.confidence,
+    description: identity.description,
+    label: identity.label,
     name: processInfo?.name || "",
     pid,
     port,
     process: processInfo,
     protocol: "tcp",
+    source: identity.source,
     state: String(row.State || row.state || "Listen")
   };
 }

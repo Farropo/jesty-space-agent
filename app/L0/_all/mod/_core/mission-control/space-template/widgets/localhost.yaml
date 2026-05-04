@@ -7,11 +7,15 @@ col: 5
 row: 0
 renderer: |-
   async (parent) => {
-    const { css, loadSnapshot } = await import("/mod/_core/mission-control/widget-runtime.js")
+    const { css, escapeHtml, loadSnapshot } = await import("/mod/_core/mission-control/widget-runtime.js")
     const root = css(parent)
     const snapshot = await loadSnapshot()
     const probes = snapshot.providers?.localhost_http?.data?.reachable || []
     root.innerHTML = "<h3>Localhost</h3>" + (probes.length ? probes.slice(0, 8).map((p) => `
-      <a class="row" href="${p.url}" target="_blank" rel="noreferrer"><span>${p.title || p.url}</span><strong>${p.status}</strong></a>
+      <a class="row stack" href="${escapeHtml(p.url)}" target="_blank" rel="noreferrer">
+        <span>${escapeHtml(p.label || p.title || p.url)}</span>
+        <small>${escapeHtml(p.description || p.url)}</small>
+        <strong>${escapeHtml(p.status)}</strong>
+      </a>
     `).join("") : '<p class="muted">No reachable local HTTP surfaces.</p>')
   }

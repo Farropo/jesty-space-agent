@@ -18,7 +18,7 @@
           <header class="mission-control-header">
             <div class="mission-control-title">
               <p class="page-eyebrow">Local Mission Control</p>
-              <h1>Jesty Mission Control</h1>
+              <h1>Jesty's Mission Control</h1>
               <div class="mission-control-meta">
                 <span x-text="$store.missionControl.generatedAtLabel ? `Updated ${$store.missionControl.generatedAtLabel}` : 'Waiting for telemetry'"></span>
                 <span x-text="`${$store.missionControl.configAppCount} managed apps`"></span>
@@ -109,8 +109,8 @@
                 </div>
                 <div>
                   <span>CPU</span>
-                  <strong x-text="$store.missionControl.system.cpuCount || 0"></strong>
-                  <small x-text="$store.missionControl.system.cpuModel || 'n/a'"></small>
+                  <strong x-text="$store.missionControl.system.cpuUsagePercent !== null && $store.missionControl.system.cpuUsagePercent !== undefined ? `${$store.missionControl.system.cpuUsagePercent}%` : 'n/a'"></strong>
+                  <small x-text="`${$store.missionControl.system.cpuCount || 0} cores`"></small>
                 </div>
                 <div>
                   <span>Uptime</span>
@@ -123,6 +123,12 @@
                   <div class="mission-row">
                     <span x-text="disk.id"></span>
                     <strong x-text="`${$store.missionControl.formatBytes(disk.freeBytes)} free`"></strong>
+                  </div>
+                </template>
+                <template x-for="proc in $store.missionControl.topMemoryProcesses" :key="`ram-${proc.pid}`">
+                  <div class="mission-row mission-row--stack">
+                    <span x-text="proc.name || 'process'"></span>
+                    <strong x-text="$store.missionControl.formatBytes(proc.workingSetBytes)"></strong>
                   </div>
                 </template>
               </div>
@@ -175,8 +181,9 @@
               </div>
               <div class="mission-list">
                 <template x-for="probe in $store.missionControl.reachableHttp" :key="probe.url">
-                  <a class="mission-row mission-link-row" :href="probe.url" target="_blank" rel="noreferrer">
-                    <span x-text="probe.title || probe.url"></span>
+                  <a class="mission-row mission-link-row mission-row--stack" :href="probe.url" target="_blank" rel="noreferrer">
+                    <span x-text="probe.label || probe.title || probe.url"></span>
+                    <small x-text="probe.description || probe.url"></small>
                     <strong x-text="probe.status"></strong>
                   </a>
                 </template>
@@ -193,8 +200,9 @@
               </div>
               <div class="mission-list">
                 <template x-for="port in $store.missionControl.highlightedPorts" :key="`${port.pid}-${port.port}`">
-                  <div class="mission-row">
-                    <span x-text="`${port.name || 'process'} :${port.port}`"></span>
+                  <div class="mission-row mission-row--stack">
+                    <span x-text="`${port.label || port.name || 'process'} :${port.port}`"></span>
+                    <small x-text="port.description || port.commandLine || ''"></small>
                     <strong x-text="`PID ${port.pid}`"></strong>
                   </div>
                 </template>
@@ -207,14 +215,32 @@
                   <h2>LM Studio</h2>
                   <p>OpenAI-compatible local API</p>
                 </div>
-                <span class="mission-status" :class="$store.missionControl.statusClass('lm_studio')" x-text="$store.missionControl.providerStatus('lm_studio')"></span>
+                <div class="mission-heading-actions">
+                  <button type="button" class="secondary-button mission-icon-button" :disabled="$store.missionControl.lmStudioActionId" @click="$store.missionControl.handleLmStudioStart()" title="Start LM Studio server">
+                    <x-icon x-text="$store.missionControl.lmStudioActionId === 'start' ? 'hourglass_top' : 'play_arrow'"></x-icon>
+                  </button>
+                  <span class="mission-status" :class="$store.missionControl.statusClass('lm_studio')" x-text="$store.missionControl.providerStatus('lm_studio')"></span>
+                </div>
               </div>
               <p class="mission-provider-reason" x-show="$store.missionControl.providerReason('lm_studio')" x-text="$store.missionControl.providerReason('lm_studio')"></p>
               <div class="mission-list">
                 <template x-for="model in $store.missionControl.lmStudioModels" :key="model.id">
                   <div class="mission-row">
-                    <span x-text="model.id"></span>
-                    <strong x-text="model.ownedBy || model.object"></strong>
+                    <span class="mission-row-main">
+                      <strong x-text="$store.missionControl.modelTitle(model)"></strong>
+                      <small x-text="$store.missionControl.modelMeta(model) || model.ownedBy || model.object"></small>
+                    </span>
+                    <button
+                      type="button"
+                      class="secondary-button"
+                      x-show="model.loadable && !model.loaded"
+                      :disabled="$store.missionControl.lmStudioActionId"
+                      @click="$store.missionControl.handleLmStudioModelLoad(model)"
+                    >
+                      <x-icon x-text="$store.missionControl.lmStudioActionId === model.id ? 'hourglass_top' : 'download'"></x-icon>
+                      <span>Load</span>
+                    </button>
+                    <strong x-show="!model.loadable || model.loaded" x-text="model.loaded ? 'loaded' : (model.ownedBy || model.object)"></strong>
                   </div>
                 </template>
               </div>

@@ -4,7 +4,7 @@
 
 `server/lib/mission_control/` owns the backend side of Mission Control.
 
-This subtree is the narrow OS boundary for facts and actions that the browser cannot safely perform itself: local process and port inspection, localhost health probes, LM Studio detection, SQLite read-only inspection, Windows service visibility, Docker diagnostics, network counters, and registered-app lifecycle control.
+This subtree is the narrow OS boundary for facts and actions that the browser cannot safely perform itself: local process and port inspection, localhost health probes, LM Studio detection and fixed local model-server actions, SQLite read-only inspection, Windows service visibility, Docker diagnostics, network counters, and registered-app lifecycle control.
 
 Documentation is top priority for this subtree. After any change under `server/lib/mission_control/` or to any `mission_control_*` API contract, update this file, `server/api/AGENTS.md`, and the matching supplemental documentation module docs in the same session.
 
@@ -64,6 +64,7 @@ Safety rules:
 - never accept raw shell text from the UI
 - only registered app ids can be started, stopped, or restarted
 - app starts use `spawn(..., { shell: false })`
+- LM Studio start uses the fixed `lms server start --port 1234` action, and model loading uses the fixed localhost native REST endpoint with a selected model id
 - probes must pass `local_url.js` and are limited to `http` or `https` localhost URLs
 - external PID stop requires explicit confirmation and must still match the registered executable or cwd signature
 - every start, stop, restart, and config update should append an audit entry

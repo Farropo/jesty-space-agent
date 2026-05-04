@@ -1,5 +1,5 @@
 export const MISSION_CONTROL_SPACE_ID = "mission-control";
-export const MISSION_CONTROL_TEMPLATE_VERSION = "mission-control-static-v1";
+export const MISSION_CONTROL_TEMPLATE_VERSION = "mission-control-static-v3";
 
 const TEMPLATE_ROOT = "/mod/_core/mission-control/space-template";
 const TEMPLATE_VERSION_PATH = "data/template-version.txt";

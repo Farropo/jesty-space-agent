@@ -9,11 +9,12 @@ Each file should expose one narrow provider family and return normalized plain J
 ## Ownership
 
 - `common.js`: shared provider envelope, PowerShell JSON helper, numeric coercion, and small constants.
+- `service_catalog.js`: built-in localhost and port identity labels used by HTTP probes and port rows.
 - `system.js`: OS, memory, disk, and network counters.
 - `processes.js`: Windows process discovery and process signature helpers.
 - `ports.js`: listening TCP port discovery.
 - `localhost_http.js`: localhost-only HTTP probes.
-- `lm_studio.js`: LM Studio process/API detection and model parsing.
+- `lm_studio.js`: LM Studio process/API detection, native model parsing, fixed server start, and fixed model-load actions.
 - `sqlite.js`: bounded SQLite discovery and read-only schema inspection.
 - `windows_services.js`: Windows service state.
 - `docker.js`: Docker CLI/daemon diagnostics.
@@ -26,4 +27,5 @@ Each file should expose one narrow provider family and return normalized plain J
 - prefer structured APIs such as PowerShell objects, Docker JSON output, and read-only SQLite connections
 - never add generic shell execution or arbitrary command text
 - keep app actions registry-based and use `spawn(..., { shell: false })`
+- keep LM Studio actions fixed to the default local server contract; do not accept arbitrary CLI args or URLs
 - when adding a provider, include focused tests for provider normalization and degraded behavior
